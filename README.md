@@ -19,12 +19,11 @@ DAB+ Radio mit Bluetooth-Audioausgabe und Web-Interface für Raspberry Pi Zero W
 
 ## 🚀 Quick Install (One Command)
 
-> **💡 Empfohlen:** Verwende **Raspberry Pi OS (Legacy, 32-bit) Lite - Bookworm**
+> **💡 Unterstützte Versionen:**
+> - **Debian 13 Trixie (32-bit)** - ✅ Vollständig unterstützt
+> - **Raspberry Pi OS (Legacy, 32-bit) Lite - Bookworm** - ✅ Unterstützt
 >
-> **⚠️ Experimentell:** Trixie (32-bit) funktioniert auch, aber:
-> - Einige Pakete könnten ARMv6-Kompatibilitätsprobleme haben
-> - BlueALSA/Python-Bibliotheken evtl. nicht verfügbar
-> - Bookworm ist stabiler und getestet für dieses Projekt
+> **Hinweis:** Das Installationsskript verwendet PulseAudio für Bluetooth-Audio und erkennt automatisch die OS-Version.
 
 Flashe Raspberry Pi OS Lite auf eine SD-Karte, aktiviere SSH, verbinde dich mit dem Pi und führe aus:
 
@@ -101,6 +100,10 @@ Verbinde dich mit dem WLAN **"DAB-Radio"** (Passwort: `dabradio123`).
 ```
 dab-radio/
 ├── install.sh              # Hauptinstaller
+├── ugreen-dab/             # uGreen DAB Board Software (v16, lokal)
+│   ├── radio_cli_v3.2.1    # DAB Radio CLI Tool (32-bit)
+│   ├── DABBoardRadio_v0.17.2
+│   └── license.txt
 ├── config/
 │   ├── hostapd.conf        # WiFi AP Konfiguration
 │   ├── dnsmasq.conf        # DHCP Server
@@ -117,6 +120,8 @@ dab-radio/
 │       └── index.html       # Web UI
 └── README.md
 ```
+
+**Hinweis:** Die uGreen DAB Board Software (v16) ist bereits im Repository enthalten und muss nicht mehr heruntergeladen werden.
 
 ## Konfiguration ändern
 

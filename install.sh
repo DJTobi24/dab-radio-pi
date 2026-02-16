@@ -15,33 +15,39 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_DIR="/opt/dab-radio"
 
-echo "📦 [1/8] System-Pakete aktualisieren & installieren..."
+# OS Version erkennen
+OS_VERSION=$(cat /etc/os-release | grep VERSION_CODENAME | cut -d'=' -f2)
+echo "📋 Erkannte OS-Version: $OS_VERSION"
+
+echo "📦 [1/9] System-Pakete aktualisieren & installieren..."
 apt-get update -qq
 apt-get install -y -qq \
     python3 python3-pip python3-venv \
     hostapd dnsmasq \
-    bluez bluez-tools bluealsa \
+    bluez pulseaudio pulseaudio-module-bluetooth \
     alsa-utils \
     libncurses5 \
     unzip wget \
     iptables \
     wpasupplicant wireless-tools
 
-echo "📻 [2/8] uGreen DAB Board Software herunterladen..."
+echo "📻 [2/9] uGreen DAB Board Software installieren (v16, radio_cli v3.2.1)..."
 if [ ! -d "/usr/local/lib/ugreen-dab+" ]; then
-    cd /tmp
-    wget -q https://ugreen.eu/wp-content/uploads/files/Files_v12.zip -O Files_v12.zip
-    unzip -o -q Files_v12.zip -d /usr/local/lib/
-    mv /usr/local/lib/Files_v12 /usr/local/lib/ugreen-dab+
-    # Symlinks für radio_cli (32-bit für Pi Zero)
-    ln -sf /usr/local/lib/ugreen-dab+/radio_cli_v3.1.0 /usr/local/sbin/radio_cli
+    # Kopiere lokale uGreen-Dateien (enthalten im Repository)
+    mkdir -p /usr/local/lib/ugreen-dab+
+    cp -r "$SCRIPT_DIR/ugreen-dab/"* /usr/local/lib/ugreen-dab+/
+
+    # Symlinks für radio_cli v3.2.1 (32-bit für Pi Zero)
+    ln -sf /usr/local/lib/ugreen-dab+/radio_cli_v3.2.1 /usr/local/sbin/radio_cli
     chmod +x /usr/local/sbin/radio_cli
-    echo "   ✅ radio_cli installiert"
+    chmod +x /usr/local/lib/ugreen-dab+/DABBoardRadio_v0.17.2
+
+    echo "   ✅ radio_cli v3.2.1 installiert"
 else
     echo "   ✅ uGreen Software bereits vorhanden"
 fi
 
-echo "🔧 [3/8] SPI & I2S aktivieren..."
+echo "🔧 [3/9] SPI & I2S aktivieren..."
 CONFIG_FILE="/boot/firmware/config.txt"
 # Fallback für ältere Versionen
 [ ! -f "$CONFIG_FILE" ] && CONFIG_FILE="/boot/config.txt"
@@ -66,56 +72,32 @@ if grep -q "^dtparam=audio=on" "$CONFIG_FILE"; then
     sed -i 's/^dtparam=audio=on/dtparam=audio=off/' "$CONFIG_FILE"
 fi
 
-echo "📶 [4/8] WiFi Access Point konfigurieren..."
-# hostapd Konfiguration
-cp "$SCRIPT_DIR/config/hostapd.conf" /etc/hostapd/hostapd.conf
+echo "📡 [4/9] Standard-WLAN konfigurieren..."
+# wpa_supplicant Konfiguration für Standard-WLAN
+cat > /etc/wpa_supplicant/wpa_supplicant.conf << 'EOF'
+country=DE
+ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+update_config=1
 
-# hostapd als DAEMON_CONF setzen
-if [ -f /etc/default/hostapd ]; then
-    sed -i 's|^#DAEMON_CONF=.*|DAEMON_CONF="/etc/hostapd/hostapd.conf"|' /etc/default/hostapd
-fi
-
-# dnsmasq Konfiguration
-cp "$SCRIPT_DIR/config/dnsmasq.conf" /etc/dnsmasq.d/dabradio.conf
-
-# Statische IP für wlan0
-cp "$SCRIPT_DIR/config/dhcpcd.conf" /etc/dhcpcd.conf.d/dabradio.conf 2>/dev/null || true
-# Falls dhcpcd.conf.d nicht existiert, direkt in dhcpcd.conf schreiben
-if [ ! -d /etc/dhcpcd.conf.d ]; then
-    if ! grep -q "# DAB Radio AP" /etc/dhcpcd.conf; then
-        cat "$SCRIPT_DIR/config/dhcpcd.conf" >> /etc/dhcpcd.conf
-    fi
-fi
-
-# NetworkManager deaktivieren falls vorhanden (stört hostapd)
-if systemctl is-active --quiet NetworkManager 2>/dev/null; then
-    systemctl stop NetworkManager
-    systemctl disable NetworkManager
-fi
-
-# Hostapd & dnsmasq aktivieren
-systemctl unmask hostapd
-systemctl enable hostapd
-systemctl enable dnsmasq
-
-echo "🔵 [5/8] Bluetooth konfigurieren..."
-# BlueALSA Service konfigurieren
-mkdir -p /etc/systemd/system/bluealsa.service.d/
-cat > /etc/systemd/system/bluealsa.service.d/override.conf << 'EOF'
-[Service]
-ExecStart=
-ExecStart=/usr/bin/bluealsa -p a2dp-source
+network={
+    ssid="***WIFI_REMOVED***"
+    psk="***REMOVED***"
+    priority=10
+}
 EOF
 
+echo "   ✅ Standard-WLAN '***WIFI_REMOVED***' konfiguriert"
+
+echo "🔵 [5/9] Bluetooth konfigurieren..."
 # Bluetooth Auto-Power
 if ! grep -q "AutoEnable=true" /etc/bluetooth/main.conf 2>/dev/null; then
     sed -i 's/^#AutoEnable.*/AutoEnable=true/' /etc/bluetooth/main.conf 2>/dev/null || true
 fi
 
 systemctl enable bluetooth
-systemctl enable bluealsa
+systemctl enable pulseaudio
 
-echo "🐍 [6/8] Python App installieren..."
+echo "🐍 [6/9] Python App installieren..."
 mkdir -p "$APP_DIR"
 cp -r "$SCRIPT_DIR/app/"* "$APP_DIR/"
 
@@ -123,29 +105,28 @@ cp -r "$SCRIPT_DIR/app/"* "$APP_DIR/"
 python3 -m venv "$APP_DIR/venv"
 "$APP_DIR/venv/bin/pip" install --quiet flask
 
-echo "⚙️  [7/8] Systemd Service einrichten..."
+echo "⚙️  [7/9] Systemd Service einrichten..."
 cp "$SCRIPT_DIR/config/dabradio.service" /etc/systemd/system/dabradio.service
 systemctl daemon-reload
 systemctl enable dabradio
 
-echo "📁 [8/8] Datenverzeichnis erstellen..."
+echo "📁 [8/9] Datenverzeichnis erstellen..."
 mkdir -p /var/lib/dab-radio
 
 # Erstelle Standard-Netzwerkkonfiguration
 cat > /var/lib/dab-radio/network.json << 'EOF'
 {
-  "mode": "ap",
+  "mode": "client",
   "ap_ssid": "DAB-Radio",
   "ap_password": "dabradio123",
-  "client_ssid": "",
-  "client_password": "",
+  "client_ssid": "***WIFI_REMOVED***",
+  "client_password": "***REMOVED***",
   "fallback_enabled": true,
   "default_volume": 40
 }
 EOF
 
-chown pi:pi /var/lib/dab-radio
-chown pi:pi /var/lib/dab-radio/network.json
+chown -R pi:pi /var/lib/dab-radio
 
 # Create music storage directory
 mkdir -p /var/lib/dab-radio/music
@@ -168,14 +149,45 @@ cat > /var/lib/dab-radio/playback_settings.json << 'EOF'
 EOF
 chown pi:pi /var/lib/dab-radio/playback_settings.json
 
+echo "📶 [9/9] WiFi Access Point vorbereiten (NICHT aktiviert)..."
+# hostapd Konfiguration vorbereiten
+cp "$SCRIPT_DIR/config/hostapd.conf" /etc/hostapd/hostapd.conf
+
+# hostapd als DAEMON_CONF setzen
+if [ -f /etc/default/hostapd ]; then
+    sed -i 's|^#DAEMON_CONF=.*|DAEMON_CONF="/etc/hostapd/hostapd.conf"|' /etc/default/hostapd
+fi
+
+# dnsmasq Konfiguration
+cp "$SCRIPT_DIR/config/dnsmasq.conf" /etc/dnsmasq.d/dabradio.conf
+
+# Statische IP Konfiguration vorbereiten (aber nicht aktiv)
+if [ -d /etc/dhcpcd.conf.d ]; then
+    cp "$SCRIPT_DIR/config/dhcpcd.conf" /etc/dhcpcd.conf.d/dabradio.conf.disabled
+else
+    # Für später, falls AP-Modus aktiviert wird
+    cp "$SCRIPT_DIR/config/dhcpcd.conf" /etc/dabradio-ap.conf
+fi
+
+# Hostapd & dnsmasq NICHT aktivieren (nur vorbereiten)
+systemctl unmask hostapd
+systemctl unmask dnsmasq
+systemctl disable hostapd
+systemctl disable dnsmasq
+
+echo "   ✅ AP-Modus vorbereitet, aber deaktiviert"
+echo "   ℹ️  AP kann später über Web-Interface aktiviert werden"
+
 echo ""
 echo "╔══════════════════════════════════════════╗"
 echo "║          ✅ Installation fertig!          ║"
 echo "╠══════════════════════════════════════════╣"
 echo "║  Bitte jetzt neustarten: sudo reboot     ║"
 echo "║                                          ║"
-echo "║  Danach:                                 ║"
-echo "║  1. WLAN 'DAB-Radio' verbinden           ║"
-echo "║     Passwort: dabradio123                ║"
-echo "║  2. Browser: http://10.0.0.1             ║"
+echo "║  Nach dem Neustart:                      ║"
+echo "║  Pi verbindet sich mit '***WIFI_REMOVED***'      ║"
+echo "║  IP-Adresse prüfen mit: ip a             ║"
+echo "║                                          ║"
+echo "║  Oder SSH via Hostname:                  ║"
+echo "║  ssh pi@raspberrypi.local                ║"
 echo "╚══════════════════════════════════════════╝"
