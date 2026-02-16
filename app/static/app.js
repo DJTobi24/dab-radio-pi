@@ -120,15 +120,18 @@ function updateNowPlaying() {
 
 // ─── Stop ───────────────────────────────────────────
 
-document.getElementById("btnStop").addEventListener("click", async () => {
-    await api("/stop", "POST");
-    state.isPlaying = false;
-    state.currentStation = null;
-    updateNowPlaying();
-    renderStations();
-    renderFavorites();
-    toast("Wiedergabe gestoppt");
-});
+const btnStop = document.getElementById("btnStop");
+if (btnStop) {
+    btnStop.addEventListener("click", async () => {
+        await api("/stop", "POST");
+        state.isPlaying = false;
+        state.currentStation = null;
+        updateNowPlaying();
+        renderStations();
+        renderFavorites();
+        toast("Wiedergabe gestoppt");
+    });
+}
 
 // ─── Station abspielen ──────────────────────────────
 
