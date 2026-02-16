@@ -26,7 +26,7 @@ apt-get install -y -qq \
     hostapd dnsmasq \
     bluez pulseaudio pulseaudio-module-bluetooth \
     alsa-utils \
-    libncurses5 \
+    libncurses6 \
     unzip wget \
     iptables \
     wpasupplicant wireless-tools
