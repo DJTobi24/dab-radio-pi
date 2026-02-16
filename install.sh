@@ -47,6 +47,18 @@ else
     echo "   ✅ uGreen Software bereits vorhanden"
 fi
 
+# WiringPi installieren (benötigt für DAB Board)
+if ! dpkg -l | grep -q "^ii  wiringpi"; then
+    echo "   📥 WiringPi v3.10 installieren..."
+    TEMP_DEB="/tmp/wiringpi_3.10_armhf.deb"
+    wget -q -O "$TEMP_DEB" https://github.com/WiringPi/WiringPi/releases/download/3.10/wiringpi_3.10_armhf.deb
+    dpkg -i "$TEMP_DEB"
+    rm -f "$TEMP_DEB"
+    echo "   ✅ WiringPi installiert"
+else
+    echo "   ✅ WiringPi bereits installiert"
+fi
+
 echo "🔧 [3/9] SPI & I2S aktivieren..."
 CONFIG_FILE="/boot/firmware/config.txt"
 # Fallback für ältere Versionen
