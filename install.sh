@@ -15,6 +15,13 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_DIR="/opt/dab-radio"
 
+# Erkenne tatsächlichen User (nicht root bei sudo)
+if [ -n "$SUDO_USER" ]; then
+    ACTUAL_USER="$SUDO_USER"
+else
+    ACTUAL_USER="pi"
+fi
+
 # OS Version erkennen
 OS_VERSION=$(cat /etc/os-release | grep VERSION_CODENAME | cut -d'=' -f2)
 echo "📋 Erkannte OS-Version: $OS_VERSION"
@@ -113,6 +120,8 @@ python3 -m venv "$APP_DIR/venv"
 
 echo "⚙️  [7/9] Systemd Service einrichten..."
 cp "$SCRIPT_DIR/config/dabradio.service" /etc/systemd/system/dabradio.service
+# Setze korrekten User
+sed -i "s/^User=.*/User=$ACTUAL_USER/" /etc/systemd/system/dabradio.service
 systemctl daemon-reload
 systemctl enable dabradio
 
@@ -132,11 +141,11 @@ cat > /var/lib/dab-radio/network.json << 'EOF'
 }
 EOF
 
-chown -R pi:pi /var/lib/dab-radio
+chown -R $ACTUAL_USER:$ACTUAL_USER /var/lib/dab-radio
 
 # Create music storage directory
 mkdir -p /var/lib/dab-radio/music
-chown pi:pi /var/lib/dab-radio/music
+chown $ACTUAL_USER:$ACTUAL_USER /var/lib/dab-radio/music
 
 # Create initial empty albums.json
 cat > /var/lib/dab-radio/albums.json << 'EOF'
@@ -144,7 +153,7 @@ cat > /var/lib/dab-radio/albums.json << 'EOF'
   "albums": []
 }
 EOF
-chown pi:pi /var/lib/dab-radio/albums.json
+chown $ACTUAL_USER:$ACTUAL_USER /var/lib/dab-radio/albums.json
 
 # Create initial playback settings
 cat > /var/lib/dab-radio/playback_settings.json << 'EOF'
@@ -153,7 +162,7 @@ cat > /var/lib/dab-radio/playback_settings.json << 'EOF'
   "auto_start_on_boot": false
 }
 EOF
-chown pi:pi /var/lib/dab-radio/playback_settings.json
+chown $ACTUAL_USER:$ACTUAL_USER /var/lib/dab-radio/playback_settings.json
 
 echo "📶 [9/9] WiFi Access Point vorbereiten (NICHT aktiviert)..."
 # hostapd Konfiguration vorbereiten
