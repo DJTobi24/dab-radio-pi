@@ -8,6 +8,7 @@ mit Bluetooth-Audio-Ausgabe.
 from flask import Flask, render_template, jsonify, request
 from radio_control import RadioControl
 from bt_manager import BluetoothManager
+from wifi_manager import WiFiManager
 import threading
 import time
 import os
@@ -19,8 +20,9 @@ app = Flask(__name__,
 
 radio = RadioControl()
 bt = BluetoothManager()
+wifi = WiFiManager()
 
-DEFAULT_VOLUME = 40
+DEFAULT_VOLUME = wifi.get_default_volume()
 
 
 # ─── Seiten ──────────────────────────────────────────
@@ -197,6 +199,106 @@ def api_bt_remove():
     return jsonify({"status": "removed"})
 
 
+# ─── Network/WiFi API ────────────────────────────────
+
+@app.route("/api/network/status")
+def api_network_status():
+    """Netzwerkstatus abrufen."""
+    return jsonify(wifi.get_status())
+
+
+@app.route("/api/wifi/scan", methods=["POST"])
+def api_wifi_scan():
+    """WLAN-Netzwerke scannen."""
+    def _do_scan():
+        return wifi.scan_networks()
+
+    # Scan in background thread
+    networks = []
+    def scan_thread():
+        nonlocal networks
+        networks = wifi.scan_networks()
+
+    thread = threading.Thread(target=scan_thread, daemon=True)
+    thread.start()
+    thread.join(timeout=15)  # Wait max 15 seconds
+
+    return jsonify({"networks": networks})
+
+
+@app.route("/api/wifi/connect", methods=["POST"])
+def api_wifi_connect():
+    """Mit WLAN-Netzwerk verbinden."""
+    data = request.json or {}
+    ssid = data.get("ssid")
+    password = data.get("password")
+
+    if not ssid:
+        return jsonify({"error": "Kein SSID angegeben"}), 400
+
+    success = wifi.connect_to_network(ssid, password)
+    return jsonify({"connected": success})
+
+
+@app.route("/api/wifi/disconnect", methods=["POST"])
+def api_wifi_disconnect():
+    """Zurück zum AP-Modus wechseln."""
+    wifi.switch_to_ap_mode()
+    return jsonify({"status": "ap_mode"})
+
+
+# ─── Settings API ────────────────────────────────────
+
+@app.route("/api/settings")
+def api_get_settings():
+    """Alle Einstellungen abrufen."""
+    ap_config = wifi.get_ap_config()
+    return jsonify({
+        "ap_ssid": ap_config["ssid"],
+        "ap_password": ap_config["password"],
+        "mode": wifi.mode,
+        "fallback_enabled": wifi.is_fallback_enabled(),
+        "default_volume": wifi.get_default_volume()
+    })
+
+
+@app.route("/api/settings/ap", methods=["POST"])
+def api_update_ap_settings():
+    """AP-Einstellungen aktualisieren."""
+    data = request.json or {}
+    ssid = data.get("ssid")
+    password = data.get("password")
+
+    if not ssid or not password:
+        return jsonify({"error": "SSID und Passwort erforderlich"}), 400
+
+    success, message = wifi.set_ap_config(ssid, password)
+    if success:
+        return jsonify({"status": "success", "message": message})
+    else:
+        return jsonify({"error": message}), 400
+
+
+@app.route("/api/settings/volume", methods=["POST"])
+def api_set_default_volume():
+    """Standard-Lautstärke setzen."""
+    data = request.json or {}
+    volume = data.get("volume", 40)
+    wifi.set_default_volume(volume)
+    global DEFAULT_VOLUME
+    DEFAULT_VOLUME = volume
+    return jsonify({"volume": volume})
+
+
+@app.route("/api/settings/fallback", methods=["POST"])
+def api_set_fallback():
+    """Fallback-Modus aktivieren/deaktivieren."""
+    data = request.json or {}
+    enabled = data.get("enabled", True)
+    wifi.set_fallback_enabled(enabled)
+    return jsonify({"fallback_enabled": enabled})
+
+
 # ─── Startup ─────────────────────────────────────────
 
 def startup_tasks():
@@ -205,11 +307,35 @@ def startup_tasks():
     bt.power_on()
     # Auto-Reconnect zum letzten BT-Gerät
     bt.auto_reconnect()
+    # Set default volume
+    radio.set_volume(DEFAULT_VOLUME)
+
+
+def network_monitor():
+    """Überwacht Netzwerkverbindung und wechselt bei Bedarf zu AP-Modus."""
+    while True:
+        time.sleep(30)  # Check every 30 seconds
+
+        if wifi.mode == "client" and wifi.is_fallback_enabled():
+            # Check if we're still connected
+            connected, _, _ = wifi._check_client_connection()
+
+            if not connected:
+                # Check internet connectivity
+                has_internet = wifi.check_connectivity()
+
+                if not has_internet:
+                    print("⚠️ Client-Verbindung verloren, wechsle zu AP-Modus...")
+                    wifi.switch_to_ap_mode()
+                    time.sleep(10)  # Wait a bit after switching
 
 
 if __name__ == "__main__":
     # Startup im Hintergrund
     threading.Thread(target=startup_tasks, daemon=True).start()
+
+    # Network monitor im Hintergrund
+    threading.Thread(target=network_monitor, daemon=True).start()
 
     app.run(
         host="0.0.0.0",

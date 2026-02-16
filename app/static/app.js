@@ -68,6 +68,7 @@ document.querySelectorAll(".tab").forEach(tab => {
         if (tab.dataset.tab === "bluetooth") loadBtDevices();
         if (tab.dataset.tab === "stations") loadStations();
         if (tab.dataset.tab === "favorites") loadFavorites();
+        if (tab.dataset.tab === "settings") loadSettings();
     });
 });
 
@@ -457,6 +458,203 @@ async function pollStatus() {
             updateBtStatus(null);
         }
     }
+}
+
+// ─── Settings & Network ─────────────────────────────
+
+async function loadSettings() {
+    const res = await api("/settings");
+    if (!res) return;
+
+    // Load settings into form
+    document.getElementById("apSsid").value = res.ap_ssid || "";
+    document.getElementById("apPassword").value = res.ap_password || "";
+    document.getElementById("defaultVolume").value = res.default_volume || 40;
+    document.getElementById("defaultVolumeValue").textContent = res.default_volume || 40;
+    document.getElementById("fallbackEnabled").checked = res.fallback_enabled !== false;
+
+    // Load network status
+    updateNetworkStatus();
+}
+
+async function updateNetworkStatus() {
+    const res = await api("/network/status");
+    if (!res) return;
+
+    const status = document.getElementById("networkStatus");
+
+    if (res.mode === "client") {
+        if (res.connected) {
+            status.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+                        <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+                        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+                        <line x1="12" y1="20" x2="12.01" y2="20"/>
+                    </svg>
+                    <div>
+                        <div style="font-weight: 600;">✅ Verbunden mit: ${res.ssid}</div>
+                        <div style="font-size: 0.8125rem; color: hsl(var(--muted-foreground)); margin-top: 0.125rem;">IP: ${res.ip_address}</div>
+                    </div>
+                </div>
+            `;
+        } else {
+            status.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="1" y1="1" x2="23" y2="23"/>
+                        <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
+                        <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
+                        <path d="M10.71 5.05A16 16 0 0 1 22.58 9"/>
+                        <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
+                        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+                        <line x1="12" y1="20" x2="12.01" y2="20"/>
+                    </svg>
+                    <div style="font-weight: 600;">⚠️ Client-Modus (Nicht verbunden)</div>
+                </div>
+            `;
+        }
+    } else {
+        status.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>
+                    <path d="M2 12h20"/>
+                </svg>
+                <div style="font-weight: 600;">📡 Access Point Modus (${res.ap_ssid})</div>
+            </div>
+        `;
+    }
+}
+
+async function updateApSettings() {
+    const ssid = document.getElementById("apSsid").value;
+    const password = document.getElementById("apPassword").value;
+
+    if (!ssid || !password) {
+        toast("Bitte SSID und Passwort eingeben", "error");
+        return;
+    }
+
+    if (password.length < 8) {
+        toast("Passwort muss mindestens 8 Zeichen lang sein", "error");
+        return;
+    }
+
+    const res = await api("/settings/ap", "POST", { ssid, password });
+
+    if (res && !res.error) {
+        toast("✅ AP-Einstellungen gespeichert. Bitte neustarten.", "success");
+    } else {
+        toast(res?.error || "Fehler beim Speichern", "error");
+    }
+}
+
+async function scanWifi() {
+    const progress = document.getElementById("wifiScanProgress");
+    const list = document.getElementById("wifiNetworkList");
+
+    progress.style.display = "flex";
+    list.innerHTML = "";
+
+    toast("Suche WLAN-Netzwerke...");
+
+    const res = await api("/wifi/scan", "POST");
+
+    progress.style.display = "none";
+
+    if (!res || !res.networks || res.networks.length === 0) {
+        list.innerHTML = `
+            <div class="empty-state">
+                <p>Keine Netzwerke gefunden</p>
+                <p class="hint">Stelle sicher, dass WLAN-Netzwerke in Reichweite sind</p>
+            </div>
+        `;
+        return;
+    }
+
+    list.innerHTML = res.networks.map(n => `
+        <div class="wifi-item" onclick='connectToWifi("${n.ssid.replace(/"/g, '\\"')}", ${n.encrypted})'>
+            <div class="wifi-info">
+                <div class="wifi-ssid">${esc(n.ssid)}</div>
+                <div class="wifi-meta">
+                    ${n.encrypted ? '🔒' : '🔓'} Signal: ${n.signal}%
+                </div>
+            </div>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6"/>
+            </svg>
+        </div>
+    `).join("");
+
+    toast(`${res.networks.length} Netzwerke gefunden`, "success");
+}
+
+async function connectToWifi(ssid, encrypted) {
+    let password = "";
+
+    if (encrypted) {
+        password = prompt(`Passwort für "${ssid}":`);
+        if (!password) return;
+    }
+
+    toast(`Verbinde mit ${ssid}...`);
+
+    const res = await api("/wifi/connect", "POST", { ssid, password });
+
+    if (res && res.connected) {
+        toast(`✅ Verbunden mit ${ssid}`, "success");
+        // Wait a bit then reload status
+        setTimeout(() => {
+            updateNetworkStatus();
+            // Update fallback checkbox
+            updateFallbackSetting();
+        }, 2000);
+    } else {
+        toast("❌ Verbindung fehlgeschlagen", "error");
+    }
+}
+
+async function switchToApMode() {
+    if (!confirm("Zurück zum Access Point Modus wechseln?")) return;
+
+    toast("Wechsle zu AP-Modus...");
+
+    await api("/wifi/disconnect", "POST");
+
+    setTimeout(() => {
+        toast("AP-Modus aktiviert", "success");
+        updateNetworkStatus();
+    }, 3000);
+}
+
+async function updateDefaultVolume() {
+    const volume = parseInt(document.getElementById("defaultVolume").value);
+
+    await api("/settings/volume", "POST", { volume });
+
+    toast("✅ Standard-Lautstärke gespeichert", "success");
+}
+
+async function updateFallbackSetting() {
+    const enabled = document.getElementById("fallbackEnabled").checked;
+    await api("/settings/fallback", "POST", { enabled });
+}
+
+// Update default volume display on slider change
+const defaultVolumeSlider = document.getElementById("defaultVolume");
+if (defaultVolumeSlider) {
+    defaultVolumeSlider.addEventListener("input", () => {
+        document.getElementById("defaultVolumeValue").textContent = defaultVolumeSlider.value;
+    });
+}
+
+// Update fallback setting on checkbox change
+const fallbackCheckbox = document.getElementById("fallbackEnabled");
+if (fallbackCheckbox) {
+    fallbackCheckbox.addEventListener("change", updateFallbackSetting);
 }
 
 // ─── Helpers ────────────────────────────────────────

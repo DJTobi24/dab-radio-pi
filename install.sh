@@ -24,7 +24,8 @@ apt-get install -y -qq \
     alsa-utils \
     libncurses5 \
     unzip wget \
-    iptables
+    iptables \
+    wpasupplicant wireless-tools
 
 echo "📻 [2/8] uGreen DAB Board Software herunterladen..."
 if [ ! -d "/usr/local/lib/ugreen-dab+" ]; then
@@ -129,7 +130,22 @@ systemctl enable dabradio
 
 echo "📁 [8/8] Datenverzeichnis erstellen..."
 mkdir -p /var/lib/dab-radio
+
+# Erstelle Standard-Netzwerkkonfiguration
+cat > /var/lib/dab-radio/network.json << 'EOF'
+{
+  "mode": "ap",
+  "ap_ssid": "DAB-Radio",
+  "ap_password": "dabradio123",
+  "client_ssid": "",
+  "client_password": "",
+  "fallback_enabled": true,
+  "default_volume": 40
+}
+EOF
+
 chown pi:pi /var/lib/dab-radio
+chown pi:pi /var/lib/dab-radio/network.json
 
 echo ""
 echo "╔══════════════════════════════════════════╗"
