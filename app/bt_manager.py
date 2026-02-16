@@ -159,23 +159,69 @@ class BluetoothManager:
         return True
 
     def pair(self, mac):
-        """Gerät paaren."""
-        self.power_on()
+        """Gerät paaren mit interaktiver Session."""
+        try:
+            # Interaktive bluetoothctl Session
+            proc = subprocess.Popen(
+                ["bluetoothctl"],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1
+            )
 
-        # Kurzer Scan damit Gerät für bluetoothd sichtbar wird
-        scan_output = self._run_btctl(["scan on"], timeout=3)
-        time.sleep(2)
-        self._run_btctl(["scan off"])
+            # Bluetooth einschalten und Agent registrieren
+            proc.stdin.write("power on\n")
+            proc.stdin.write("agent NoInputNoOutput\n")  # Auto-accept Pairing
+            proc.stdin.write("default-agent\n")
+            proc.stdin.flush()
+            time.sleep(1)  # Warten bis Agent bereit ist
 
-        output = self._run_btctl([
-            f"pair {mac}",
-        ], timeout=30)
+            # Kurzer Scan damit Gerät sichtbar wird
+            proc.stdin.write("scan on\n")
+            proc.stdin.flush()
+            time.sleep(3)  # Scan laufen lassen
+            proc.stdin.write("scan off\n")
+            proc.stdin.flush()
+            time.sleep(0.5)
 
-        success = "Pairing successful" in output or "Already exists" in output
-        if success:
-            # Trust setzen damit auto-reconnect funktioniert
-            self._run_btctl([f"trust {mac}"])
-        return success
+            # Pairing starten
+            proc.stdin.write(f"pair {mac}\n")
+            proc.stdin.flush()
+
+            # Output lesen und auf Erfolg warten
+            success = False
+            timeout = time.time() + 20
+            output_lines = []
+
+            import select
+            while time.time() < timeout:
+                if proc.stdout in select.select([proc.stdout], [], [], 0.5)[0]:
+                    line = proc.stdout.readline()
+                    output_lines.append(line)
+
+                    if "Pairing successful" in line or "Connection successful" in line:
+                        success = True
+                        break
+                    elif "Failed to pair" in line or "not available" in line:
+                        break
+
+            if success:
+                # Trust setzen für Auto-Reconnect
+                proc.stdin.write(f"trust {mac}\n")
+                proc.stdin.flush()
+                time.sleep(0.5)
+
+            # Session beenden
+            proc.stdin.write("quit\n")
+            proc.stdin.flush()
+            proc.wait(timeout=2)
+
+            return success
+
+        except Exception as e:
+            return False
 
     def connect(self, mac):
         """Mit Bluetooth-Gerät verbinden."""
