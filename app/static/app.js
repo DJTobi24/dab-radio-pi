@@ -105,6 +105,8 @@ function updateNowPlaying() {
     const npStation = document.getElementById("npStation");
     const npEnsemble = document.getElementById("npEnsemble");
 
+    if (!npStatus || !npStation || !npEnsemble) return;
+
     if (state.isPlaying && state.currentStation) {
         npStatus.textContent = "Läuft";
         npStatus.className = "np-status playing";
@@ -156,14 +158,17 @@ async function loadStations() {
     const res = await api("/stations");
     if (res) {
         state.stations = res.stations || [];
-        document.getElementById("stationCount").textContent =
-            state.stations.length ? `${state.stations.length} Sender` : "";
+        const stationCount = document.getElementById("stationCount");
+        if (stationCount) {
+            stationCount.textContent = state.stations.length ? `${state.stations.length} Sender` : "";
+        }
         renderStations();
     }
 }
 
 function renderStations() {
     const list = document.getElementById("stationsList");
+    if (!list) return;
     if (!state.stations.length) {
         list.innerHTML = `
             <div class="empty-state">
@@ -257,6 +262,7 @@ async function loadFavorites() {
 
 function renderFavorites() {
     const list = document.getElementById("favoritesList");
+    if (!list) return;
     if (!state.favorites.length) {
         list.innerHTML = `
             <div class="empty-state">
@@ -329,6 +335,7 @@ async function loadBtDevices() {
 
 function renderBtDevices(devices) {
     const list = document.getElementById("btDeviceList");
+    if (!list) return;
 
     if (!devices.length) {
         list.innerHTML = `
