@@ -19,7 +19,11 @@ DAB+ Radio mit Bluetooth-Audioausgabe und Web-Interface für Raspberry Pi Zero W
 
 ## 🚀 Quick Install (One Command)
 
-Flashe Raspberry Pi OS Lite (32-bit) auf eine SD-Karte, aktiviere SSH, verbinde dich mit dem Pi und führe aus:
+> **⚠️ Wichtig:** Verwende **Raspberry Pi OS (Legacy, 32-bit) Lite - Bookworm**
+> Der Pi Zero WH hat einen ARMv6-Prozessor und benötigt die Legacy-Version!
+> Trixie und Standard-Bookworm funktionieren NICHT auf dem Pi Zero!
+
+Flashe Raspberry Pi OS Lite (32-bit, Legacy) auf eine SD-Karte, aktiviere SSH, verbinde dich mit dem Pi und führe aus:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/djtobi24/dab-radio-pi/main/bootstrap.sh | sudo bash
@@ -34,9 +38,19 @@ Das wars! Nach einem Reboot (`sudo reboot`) verbinde dich mit dem WLAN **"DAB-Ra
 <details>
 <summary>Klicke hier für detaillierte Installationsschritte</summary>
 
-### 1. Raspberry Pi OS Lite (32-bit) auf SD-Karte flashen
+### 1. Raspberry Pi OS auf SD-Karte flashen
 
-Verwende den Raspberry Pi Imager. **Wichtig**: 32-bit Lite Version (Bookworm).
+Verwende den **Raspberry Pi Imager**:
+
+1. **Raspberry Pi Device**: Wähle `Raspberry Pi Zero`
+2. **Operating System**: Wähle `Raspberry Pi OS (Legacy, 32-bit) Lite`
+   - Das ist Debian Bookworm für ARMv6
+3. **Storage**: Wähle deine SD-Karte
+
+> ⚠️ **Nicht verwenden:**
+> - ❌ Raspberry Pi OS (32-bit) - Trixie (funktioniert nicht auf Pi Zero!)
+> - ❌ Raspberry Pi OS (64-bit) (Pi Zero ist 32-bit only)
+> - ✅ Nur **Legacy, 32-bit, Lite** mit Bookworm!
 
 ### 2. SSH aktivieren
 
