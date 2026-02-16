@@ -14,6 +14,7 @@ RADIO_CLI = "/usr/local/sbin/radio_cli"
 DATA_DIR = "/var/lib/dab-radio"
 STATIONS_FILE = os.path.join(DATA_DIR, "stations.json")
 FAVORITES_FILE = os.path.join(DATA_DIR, "favorites.json")
+QUALITY_CACHE_FILE = os.path.join(DATA_DIR, "dab_quality_cache.json")
 
 
 class RadioControl:
@@ -25,6 +26,8 @@ class RadioControl:
         self.stations = []
         self.favorites = []
         self.audio_process = None
+        self.playback_mode = "dab"  # "dab" or "music"
+        self.current_track = None  # Path to current music file (if playing music)
         self._lock = threading.Lock()
 
         os.makedirs(DATA_DIR, exist_ok=True)
@@ -241,6 +244,8 @@ class RadioControl:
             "current_station": self.current_station,
             "volume": self.volume,
             "station_count": len(self.stations),
+            "playback_mode": self.playback_mode,
+            "current_track": self.current_track,
         }
 
     # --- Favoriten ---
@@ -294,3 +299,176 @@ class RadioControl:
                 self.stations = json.load(f)
         except (IOError, json.JSONDecodeError):
             self.stations = []
+
+    # --- Music Playback ---
+
+    def start_music_playback(self, file_path, bt_mac):
+        """
+        Play music file through BlueALSA.
+
+        Args:
+            file_path: Absolute path to audio file
+            bt_mac: Bluetooth device MAC address
+
+        Returns:
+            bool: True if playback started successfully
+        """
+        with self._lock:
+            self.stop_audio()
+
+            if not os.path.exists(file_path):
+                return False
+
+            # Play audio file through BlueALSA
+            cmd = f"aplay -D bluealsa:DEV={bt_mac},PROFILE=a2dp \"{file_path}\" -q"
+
+            self.audio_process = subprocess.Popen(
+                cmd, shell=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+
+            self.is_playing = True
+            self.playback_mode = "music"
+            self.current_track = file_path
+
+            return True
+
+    # --- Quality Metrics ---
+
+    def extract_quality_metrics(self):
+        """
+        Extract signal quality metrics from last scan data.
+
+        Parses ensemblescan_*.json files for quality information and caches it.
+        """
+        # Find scan files
+        scan_files = glob.glob("/tmp/ensemblescan_*.json") + \
+                     glob.glob(os.path.expanduser("~/ensemblescan_*.json")) + \
+                     glob.glob("ensemblescan_*.json")
+
+        if not scan_files:
+            return
+
+        # Use most recent scan file
+        scan_file = max(scan_files, key=os.path.getmtime)
+
+        try:
+            with open(scan_file, "r") as f:
+                scan_data = json.load(f)
+
+            quality_data = {}
+
+            # Parse ensembles for quality data
+            if isinstance(scan_data, list):
+                ensembles = scan_data
+            elif isinstance(scan_data, dict) and "ensembles" in scan_data:
+                ensembles = scan_data["ensembles"]
+            else:
+                return
+
+            for ensemble in ensembles:
+                ens_id = ensemble.get("id", ensemble.get("ensemble_id", 0))
+                services = ensemble.get("services", ensemble.get("stations", []))
+
+                for service in services:
+                    svc_id = service.get("id", service.get("service_id", 0))
+                    key = f"{svc_id}_{ens_id}"
+
+                    # Extract quality fields (if available in scan data)
+                    quality_data[key] = {
+                        "service_id": svc_id,
+                        "ensemble_id": ens_id,
+                        "signal_quality": service.get("quality", service.get("signal_quality", 0)),
+                        "rssi": service.get("rssi", -99),
+                        "cnr": service.get("cnr", 0),
+                        "ber": service.get("ber", 0),
+                        "last_updated": int(time.time())
+                    }
+
+            # Save to cache
+            self._save_quality_cache(quality_data)
+
+        except (json.JSONDecodeError, IOError):
+            pass
+
+    def get_stations_with_quality(self):
+        """
+        Get stations list merged with quality metrics.
+
+        Returns:
+            list: Stations with quality data added
+        """
+        quality_cache = self._load_quality_cache()
+
+        stations_with_quality = []
+        for station in self.stations:
+            key = f"{station['service_id']}_{station['ensemble_id']}"
+            quality = quality_cache.get(key, {})
+
+            station_copy = station.copy()
+            station_copy["quality"] = quality.get("signal_quality", 0)
+            station_copy["rssi"] = quality.get("rssi", -99)
+            station_copy["cnr"] = quality.get("cnr", 0)
+            station_copy["ber"] = quality.get("ber", 0)
+
+            stations_with_quality.append(station_copy)
+
+        return stations_with_quality
+
+    def _save_quality_cache(self, quality_data):
+        """Save quality cache to JSON file."""
+        try:
+            cache = {
+                "last_updated": int(time.time()),
+                "stations": quality_data
+            }
+            with open(QUALITY_CACHE_FILE, "w") as f:
+                json.dump(cache, f, indent=2)
+        except IOError:
+            pass
+
+    def _load_quality_cache(self):
+        """Load quality cache from JSON file."""
+        try:
+            with open(QUALITY_CACHE_FILE, "r") as f:
+                cache = json.load(f)
+                return cache.get("stations", {})
+        except (IOError, json.JSONDecodeError):
+            return {}
+
+    # --- DAB Board Detection ---
+
+    def check_board_detected(self):
+        """
+        Check if DAB board is detected and responsive.
+
+        Returns:
+            dict: Detection status with keys:
+                - detected: bool
+                - status: str ("OK" or "ERROR")
+                - message: str (descriptive message)
+        """
+        try:
+            # Try to boot DAB firmware
+            stdout, stderr, rc = self._run_cli(["-b", "D"], timeout=10)
+
+            if rc == 0:
+                return {
+                    "detected": True,
+                    "status": "OK",
+                    "message": "DAB Board erfolgreich erkannt und funktionsfähig"
+                }
+            else:
+                return {
+                    "detected": False,
+                    "status": "ERROR",
+                    "message": f"Board nicht erkannt: {stderr if stderr else 'Unbekannter Fehler'}"
+                }
+
+        except Exception as e:
+            return {
+                "detected": False,
+                "status": "ERROR",
+                "message": f"Prüfung fehlgeschlagen: {str(e)}"
+            }

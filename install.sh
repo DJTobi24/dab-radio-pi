@@ -147,6 +147,27 @@ EOF
 chown pi:pi /var/lib/dab-radio
 chown pi:pi /var/lib/dab-radio/network.json
 
+# Create music storage directory
+mkdir -p /var/lib/dab-radio/music
+chown pi:pi /var/lib/dab-radio/music
+
+# Create initial empty albums.json
+cat > /var/lib/dab-radio/albums.json << 'EOF'
+{
+  "albums": []
+}
+EOF
+chown pi:pi /var/lib/dab-radio/albums.json
+
+# Create initial playback settings
+cat > /var/lib/dab-radio/playback_settings.json << 'EOF'
+{
+  "mode": "off",
+  "auto_start_on_boot": false
+}
+EOF
+chown pi:pi /var/lib/dab-radio/playback_settings.json
+
 echo ""
 echo "╔══════════════════════════════════════════╗"
 echo "║          ✅ Installation fertig!          ║"

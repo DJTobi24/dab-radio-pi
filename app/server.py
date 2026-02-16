@@ -9,6 +9,9 @@ from flask import Flask, render_template, jsonify, request
 from radio_control import RadioControl
 from bt_manager import BluetoothManager
 from wifi_manager import WiFiManager
+from music_manager import MusicManager
+from storage_monitor import StorageMonitor
+from playback_controller import PlaybackController
 import threading
 import time
 import os
@@ -21,6 +24,9 @@ app = Flask(__name__,
 radio = RadioControl()
 bt = BluetoothManager()
 wifi = WiFiManager()
+music = MusicManager()
+storage = StorageMonitor()
+playback = PlaybackController(radio, music, bt)
 
 DEFAULT_VOLUME = wifi.get_default_volume()
 
@@ -48,6 +54,8 @@ def api_scan():
     """DAB-Sendersuchlauf starten."""
     def _do_scan():
         radio.scan_stations()
+        # Extract quality metrics after scan completes
+        radio.extract_quality_metrics()
 
     thread = threading.Thread(target=_do_scan, daemon=True)
     thread.start()
@@ -299,6 +307,171 @@ def api_set_fallback():
     return jsonify({"fallback_enabled": enabled})
 
 
+# ─── Music API ───────────────────────────────────────
+
+@app.route("/api/albums")
+def api_get_albums():
+    """Alle Alben abrufen."""
+    albums = music.get_albums()
+    return jsonify({"albums": albums})
+
+
+@app.route("/api/albums", methods=["POST"])
+def api_create_album():
+    """Neues Album erstellen."""
+    data = request.json or {}
+    name = data.get("name", "").strip()
+    description = data.get("description", "").strip()
+
+    if not name:
+        return jsonify({"error": "Album-Name erforderlich"}), 400
+
+    album = music.create_album(name, description)
+    if album:
+        return jsonify({"album": album})
+    else:
+        return jsonify({"error": "Album konnte nicht erstellt werden"}), 500
+
+
+@app.route("/api/albums/<album_id>")
+def api_get_album(album_id):
+    """Album-Details abrufen."""
+    album = music.get_album(album_id)
+    if album:
+        return jsonify({"album": album})
+    else:
+        return jsonify({"error": "Album nicht gefunden"}), 404
+
+
+@app.route("/api/albums/<album_id>", methods=["DELETE"])
+def api_delete_album(album_id):
+    """Album löschen."""
+    success = music.delete_album(album_id)
+    if success:
+        return jsonify({"status": "deleted"})
+    else:
+        return jsonify({"error": "Album nicht gefunden"}), 404
+
+
+@app.route("/api/albums/<album_id>/upload", methods=["POST"])
+def api_upload_tracks(album_id):
+    """Musik-Dateien hochladen."""
+    if 'files' not in request.files:
+        return jsonify({"error": "Keine Dateien vorhanden"}), 400
+
+    files = request.files.getlist('files')
+    if not files:
+        return jsonify({"error": "Keine Dateien ausgewählt"}), 400
+
+    # Upload mit Storage-Check
+    result = music.upload_tracks(album_id, files, storage_monitor=storage)
+
+    if result["success"]:
+        return jsonify(result)
+    else:
+        return jsonify(result), 400
+
+
+@app.route("/api/albums/<album_id>/tracks/<track_id>", methods=["DELETE"])
+def api_delete_track(album_id, track_id):
+    """Track löschen."""
+    success = music.delete_track(album_id, track_id)
+    if success:
+        return jsonify({"status": "deleted"})
+    else:
+        return jsonify({"error": "Track nicht gefunden"}), 404
+
+
+@app.route("/api/albums/<album_id>/play", methods=["POST"])
+def api_play_album(album_id):
+    """Album abspielen."""
+    data = request.json or {}
+    track_index = data.get("track_index", 0)
+
+    # Check BT connection
+    bt_mac = bt.get_connected_device()
+    if not bt_mac:
+        return jsonify({"error": "Kein Bluetooth-Gerät verbunden"}), 400
+
+    # Play album via playback controller
+    success = playback.play_album(album_id, track_index)
+
+    if success:
+        return jsonify({"status": "playing", "album_id": album_id})
+    else:
+        return jsonify({"error": "Album konnte nicht abgespielt werden"}), 500
+
+
+# ─── Storage API ─────────────────────────────────────
+
+@app.route("/api/storage")
+def api_get_storage():
+    """Speicherplatz-Informationen abrufen."""
+    info = storage.get_storage_info()
+    if info:
+        return jsonify(info)
+    else:
+        return jsonify({"error": "Speicherinformationen nicht verfügbar"}), 500
+
+
+# ─── Playback Mode API ───────────────────────────────
+
+@app.route("/api/playback/settings")
+def api_get_playback_settings():
+    """Wiedergabe-Einstellungen abrufen."""
+    settings = playback.get_settings()
+    return jsonify(settings)
+
+
+@app.route("/api/playback/mode", methods=["POST"])
+def api_set_playback_mode():
+    """Wiedergabe-Modus setzen."""
+    data = request.json or {}
+    mode = data.get("mode", "off")
+
+    if mode not in playback.MODES:
+        return jsonify({"error": "Ungültiger Modus"}), 400
+
+    # Extract mode-specific settings
+    kwargs = {}
+    if "preset_station" in data:
+        kwargs["preset_station"] = data["preset_station"]
+    if "preset_album_id" in data:
+        kwargs["preset_album_id"] = data["preset_album_id"]
+    if "auto_start_on_boot" in data:
+        kwargs["auto_start_on_boot"] = data["auto_start_on_boot"]
+
+    success = playback.set_mode(mode, **kwargs)
+
+    if success:
+        return jsonify({"status": "ok", "mode": mode})
+    else:
+        return jsonify({"error": "Modus konnte nicht gesetzt werden"}), 500
+
+
+# ─── Enhanced Radio API ──────────────────────────────
+
+@app.route("/api/stations/quality")
+def api_stations_quality():
+    """Sender mit Qualitäts-Metriken abrufen."""
+    stations = radio.get_stations_with_quality()
+    return jsonify({"stations": stations})
+
+
+@app.route("/api/stations/quality/refresh", methods=["POST"])
+def api_refresh_quality():
+    """Qualitäts-Metriken aus letztem Scan extrahieren."""
+    radio.extract_quality_metrics()
+    return jsonify({"status": "ok"})
+
+
+@app.route("/api/dab/board/status")
+def api_dab_board_status():
+    """DAB Board Status prüfen."""
+    status = radio.check_board_detected()
+    return jsonify(status)
+
+
 # ─── Startup ─────────────────────────────────────────
 
 def startup_tasks():
@@ -309,6 +482,9 @@ def startup_tasks():
     bt.auto_reconnect()
     # Set default volume
     radio.set_volume(DEFAULT_VOLUME)
+    # Start playback if configured
+    time.sleep(2)  # Wait for BT to connect
+    playback.start_playback()
 
 
 def network_monitor():

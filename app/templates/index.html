@@ -55,6 +55,7 @@
         <nav class="tabs">
             <button class="tab active" data-tab="favorites">★ Favoriten</button>
             <button class="tab" data-tab="stations">📡 Sender</button>
+            <button class="tab" data-tab="music">🎵 Musik</button>
             <button class="tab" data-tab="bluetooth">🔵 Bluetooth</button>
             <button class="tab" data-tab="settings">⚙️ Einstellungen</button>
         </nav>
@@ -85,6 +86,39 @@
                 <span>Suche Sender... Das kann bis zu 2 Minuten dauern.</span>
             </div>
             <div class="station-list" id="stationsList"></div>
+        </section>
+
+        <!-- Tab: Musik -->
+        <section class="tab-content" id="tab-music">
+            <!-- Album Creation Form -->
+            <div class="settings-card">
+                <h3>📀 Neues Album erstellen</h3>
+                <div class="setting-group">
+                    <input type="text" id="newAlbumName" placeholder="Album-Name">
+                    <textarea id="newAlbumDesc" placeholder="Beschreibung (optional)" rows="2"></textarea>
+                    <button class="btn-primary" onclick="createAlbum()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+                        </svg>
+                        Album erstellen
+                    </button>
+                </div>
+            </div>
+
+            <!-- Albums List -->
+            <div id="albumsList" class="albums-grid"></div>
+
+            <!-- Upload Modal -->
+            <div id="uploadModal" class="modal" style="display:none">
+                <div class="modal-content">
+                    <h3>Musik hochladen</h3>
+                    <input type="file" id="fileUpload" multiple accept=".mp3,.flac,.wav,.ogg,.m4a,.aac">
+                    <div class="modal-actions">
+                        <button class="btn-primary" onclick="uploadTracks()">Hochladen</button>
+                        <button class="btn-secondary" onclick="closeUploadModal()">Abbrechen</button>
+                    </div>
+                </div>
+            </div>
         </section>
 
         <!-- Tab: Bluetooth -->
@@ -188,6 +222,78 @@
                             <polyline points="7 3 7 8 15 8"/>
                         </svg>
                         Lautstärke speichern
+                    </button>
+                </div>
+            </div>
+
+            <!-- Storage Info -->
+            <div class="settings-card">
+                <h3>💾 Speicherplatz</h3>
+                <div class="storage-bar">
+                    <div class="storage-used" id="storageUsedBar"></div>
+                </div>
+                <div class="storage-info">
+                    <span id="storageUsed">0 GB verwendet</span>
+                    <span id="storageAvailable">0 GB frei</span>
+                </div>
+            </div>
+
+            <!-- Playback Mode -->
+            <div class="settings-card">
+                <h3>🎶 Wiedergabe-Modus</h3>
+                <div class="setting-group">
+                    <label>Modus beim Start</label>
+                    <select id="playbackMode" onchange="updatePlaybackMode()">
+                        <option value="off">Aus</option>
+                        <option value="dab_live">DAB (letzter Sender)</option>
+                        <option value="dab_preset">DAB (fester Sender)</option>
+                        <option value="album">Album</option>
+                        <option value="album_random">Zufälliges Album</option>
+                    </select>
+                </div>
+
+                <div id="presetStationSelect" class="setting-group" style="display:none">
+                    <label>Sender auswählen</label>
+                    <select id="presetStation"></select>
+                </div>
+
+                <div id="presetAlbumSelect" class="setting-group" style="display:none">
+                    <label>Album auswählen</label>
+                    <select id="presetAlbum"></select>
+                </div>
+
+                <div class="setting-group">
+                    <label>
+                        <input type="checkbox" id="autoStartPlayback">
+                        Beim Start automatisch abspielen
+                    </label>
+                </div>
+
+                <div class="setting-group">
+                    <button class="btn-primary" onclick="savePlaybackSettings()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                            <polyline points="17 21 17 13 7 13 7 21"/>
+                            <polyline points="7 3 7 8 15 8"/>
+                        </svg>
+                        Speichern
+                    </button>
+                </div>
+            </div>
+
+            <!-- DAB Board Status -->
+            <div class="settings-card">
+                <h3>📻 DAB-Board Status</h3>
+                <div id="dabBoardStatus" class="status-info">
+                    <div class="spinner"></div>
+                    <span>Klicke auf "Prüfen" um den Status zu ermitteln</span>
+                </div>
+                <div class="setting-group">
+                    <button class="btn-scan" onclick="checkDabBoard()">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                        </svg>
+                        Board prüfen
                     </button>
                 </div>
             </div>

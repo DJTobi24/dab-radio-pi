@@ -965,3 +965,246 @@ body {
     color: hsl(var(--muted-foreground));
     margin-top: 0.125rem;
 }
+
+/* ═══ Albums ═══════════════════════════════════════ */
+
+.albums-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.album-card {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    transition: all 0.2s;
+}
+
+.album-card:hover {
+    border-color: hsl(var(--primary));
+    box-shadow: 0 4px 12px hsl(var(--foreground) / 0.05);
+}
+
+.album-cover {
+    aspect-ratio: 1;
+    background: hsl(var(--muted));
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    overflow: hidden;
+}
+
+.album-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.album-info {
+    flex: 1;
+    min-height: 3rem;
+}
+
+.album-name {
+    font-weight: 600;
+    font-size: 1rem;
+    color: hsl(var(--foreground));
+    margin-bottom: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.album-meta {
+    font-size: 0.875rem;
+    color: hsl(var(--muted-foreground));
+}
+
+.album-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.album-actions button {
+    flex: 1;
+    padding: 0.5rem;
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.album-actions button:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.album-actions button:active {
+    transform: translateY(0);
+}
+
+.album-actions button:last-child {
+    background: hsl(var(--destructive));
+    color: hsl(var(--destructive-foreground));
+}
+
+/* ═══ Storage Bar ═══════════════════════════════════ */
+
+.storage-bar {
+    width: 100%;
+    height: 8px;
+    background: hsl(var(--muted));
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 0.5rem 0;
+}
+
+.storage-used {
+    height: 100%;
+    background: hsl(var(--primary));
+    transition: width 0.3s ease;
+}
+
+.storage-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.875rem;
+    color: hsl(var(--muted-foreground));
+    margin-top: 0.5rem;
+}
+
+/* ═══ Quality Badges ════════════════════════════════ */
+
+.quality-badge {
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-left: 0.5rem;
+}
+
+.quality-good {
+    background: hsl(142, 76%, 36%);
+    color: white;
+}
+
+.quality-medium {
+    background: hsl(48, 96%, 53%);
+    color: hsl(24, 9.8%, 10%);
+}
+
+.quality-low {
+    background: hsl(0, 84%, 60%);
+    color: white;
+}
+
+/* ═══ Upload Modal ══════════════════════════════════ */
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(2px);
+}
+
+.modal-content {
+    background: hsl(var(--card));
+    padding: 2rem;
+    border-radius: 12px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.modal-content h3 {
+    margin: 0 0 1.5rem 0;
+    color: hsl(var(--foreground));
+    font-size: 1.25rem;
+}
+
+.modal-content input[type="file"] {
+    width: 100%;
+    padding: 0.75rem;
+    margin-bottom: 1.5rem;
+    border: 2px dashed hsl(var(--border));
+    border-radius: 8px;
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+    cursor: pointer;
+}
+
+.modal-content input[type="file"]:hover {
+    border-color: hsl(var(--primary));
+}
+
+.modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+}
+
+.btn-secondary {
+    padding: 0.625rem 1.25rem;
+    background: hsl(var(--secondary));
+    color: hsl(var(--secondary-foreground));
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+    opacity: 0.9;
+}
+
+/* ═══ Status Indicators ═════════════════════════════ */
+
+.status-ok {
+    color: hsl(142, 76%, 36%);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+}
+
+.status-error {
+    color: hsl(0, 84%, 60%);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+}
+
+/* ═══ Responsive ════════════════════════════════════ */
+
+@media (max-width: 640px) {
+    .albums-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .modal-content {
+        width: 95%;
+        padding: 1.5rem;
+    }
+}

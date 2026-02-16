@@ -15,6 +15,10 @@ const state = {
     btConnectedMac: null,
     btScanning: false,
     dabScanning: false,
+    albums: [],
+    currentAlbum: null,
+    playbackSettings: {},
+    storageInfo: {}
 };
 
 // ─── API Helper ─────────────────────────────────────
@@ -68,7 +72,12 @@ document.querySelectorAll(".tab").forEach(tab => {
         if (tab.dataset.tab === "bluetooth") loadBtDevices();
         if (tab.dataset.tab === "stations") loadStations();
         if (tab.dataset.tab === "favorites") loadFavorites();
-        if (tab.dataset.tab === "settings") loadSettings();
+        if (tab.dataset.tab === "music") loadAlbums();
+        if (tab.dataset.tab === "settings") {
+            loadSettings();
+            loadStorage();
+            loadPlaybackSettings();
+        }
     });
 });
 
@@ -169,12 +178,18 @@ function renderStations() {
             f.service_id === s.service_id && f.ensemble_id === s.ensemble_id);
         const initial = (s.name || "?")[0].toUpperCase();
 
+        const qualityBadge = s.quality ?
+            `<span class="quality-badge quality-${getQualityLevel(s.quality)}">${s.quality}%</span>` : '';
+
         return `
             <div class="station-item ${isPlaying ? 'playing' : ''}" data-idx="${i}">
                 <div class="station-icon">${isPlaying ? '▶' : initial}</div>
                 <div class="station-info" onclick="playStation(window._stations[${i}])">
                     <div class="station-name">${esc(s.name)}</div>
-                    <div class="station-meta">${esc(s.ensemble_label || '')}</div>
+                    <div class="station-meta">
+                        ${esc(s.ensemble_label || '')}
+                        ${qualityBadge}
+                    </div>
                 </div>
                 <button class="btn-fav ${isFav ? 'is-fav' : ''}" onclick="toggleFavorite(${i})">
                     ${isFav ? '★' : '☆'}
@@ -657,9 +672,313 @@ if (fallbackCheckbox) {
     fallbackCheckbox.addEventListener("change", updateFallbackSetting);
 }
 
+// ─── Music ──────────────────────────────────────────
+
+async function loadAlbums() {
+    const res = await api("/albums");
+    if (res) {
+        state.albums = res.albums || [];
+        renderAlbums();
+    }
+}
+
+function renderAlbums() {
+    const list = document.getElementById("albumsList");
+    if (!state.albums.length) {
+        list.innerHTML = `<div class="empty-state"><p>Noch keine Alben</p><p class="hint">Erstelle ein Album und lade Musik hoch</p></div>`;
+        return;
+    }
+
+    list.innerHTML = state.albums.map(a => `
+        <div class="album-card" data-id="${a.id}">
+            <div class="album-cover">${a.cover_art ? `<img src="/api/albums/${a.id}/cover" alt="Cover">` : '🎵'}</div>
+            <div class="album-info">
+                <div class="album-name">${esc(a.name)}</div>
+                <div class="album-meta">${a.track_count} Titel · ${formatSize(a.total_size)}</div>
+            </div>
+            <div class="album-actions">
+                <button onclick="playAlbum('${a.id}')" title="Abspielen">▶</button>
+                <button onclick="showUploadModal('${a.id}')" title="Musik hinzufügen">+</button>
+                <button onclick="deleteAlbum('${a.id}')" title="Löschen">×</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function createAlbum() {
+    const nameInput = document.getElementById("newAlbumName");
+    const descInput = document.getElementById("newAlbumDesc");
+
+    const name = nameInput.value.trim();
+    if (!name) {
+        toast("Bitte Album-Name eingeben");
+        return;
+    }
+
+    const description = descInput.value.trim();
+    const res = await api("/albums", "POST", { name, description });
+
+    if (res && res.album) {
+        toast("Album erstellt!");
+        nameInput.value = "";
+        descInput.value = "";
+        await loadAlbums();
+    } else {
+        toast("Fehler beim Erstellen", "error");
+    }
+}
+
+function showUploadModal(albumId) {
+    window._uploadAlbumId = albumId;
+    const modal = document.getElementById("uploadModal");
+    modal.style.display = "flex";
+    document.getElementById("fileUpload").value = "";
+}
+
+function closeUploadModal() {
+    document.getElementById("uploadModal").style.display = "none";
+}
+
+async function uploadTracks() {
+    const files = document.getElementById("fileUpload").files;
+    if (!files.length) {
+        toast("Keine Dateien ausgewählt");
+        return;
+    }
+
+    const formData = new FormData();
+    for (let file of files) {
+        formData.append("files", file);
+    }
+
+    toast("Lade hoch...", "info");
+
+    try {
+        const res = await fetch(`/api/albums/${window._uploadAlbumId}/upload`, {
+            method: "POST",
+            body: formData
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            toast(`${data.uploaded} ${data.uploaded === 1 ? 'Datei' : 'Dateien'} hochgeladen`);
+            await loadAlbums();
+            closeUploadModal();
+        } else {
+            toast(data.error || "Upload fehlgeschlagen", "error");
+            if (data.errors && data.errors.length > 0) {
+                console.error("Upload errors:", data.errors);
+            }
+        }
+    } catch (e) {
+        toast("Upload fehlgeschlagen", "error");
+        console.error("Upload error:", e);
+    }
+}
+
+async function playAlbum(albumId) {
+    const res = await api(`/albums/${albumId}/play`, "POST", {});
+    if (res && res.status === "playing") {
+        toast("Album wird abgespielt");
+        await pollStatus();
+    } else {
+        toast(res?.error || "Fehler beim Abspielen", "error");
+    }
+}
+
+async function deleteAlbum(albumId) {
+    const album = state.albums.find(a => a.id === albumId);
+    if (!album) return;
+
+    if (!confirm(`Album "${album.name}" wirklich löschen?`)) return;
+
+    const res = await api(`/albums/${albumId}`, "DELETE");
+    if (res && res.status === "deleted") {
+        toast("Album gelöscht");
+        await loadAlbums();
+    } else {
+        toast("Fehler beim Löschen", "error");
+    }
+}
+
+function formatSize(bytes) {
+    if (!bytes || bytes === 0) return "0 KB";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
+}
+
+// ─── Storage ────────────────────────────────────────
+
+async function loadStorage() {
+    const res = await api("/storage");
+    if (res) {
+        state.storageInfo = res;
+        updateStorageDisplay();
+    }
+}
+
+function updateStorageDisplay() {
+    const info = state.storageInfo;
+    if (!info) return;
+
+    const usedEl = document.getElementById("storageUsed");
+    const availEl = document.getElementById("storageAvailable");
+    const barEl = document.getElementById("storageUsedBar");
+
+    if (usedEl) usedEl.textContent = `${info.used_gb} GB verwendet`;
+    if (availEl) availEl.textContent = `${info.available_gb} GB frei`;
+    if (barEl) barEl.style.width = `${info.percent_used}%`;
+}
+
+// ─── Playback Mode ──────────────────────────────────
+
+async function loadPlaybackSettings() {
+    const res = await api("/playback/settings");
+    if (res) {
+        state.playbackSettings = res;
+        renderPlaybackSettings();
+    }
+}
+
+function renderPlaybackSettings() {
+    const settings = state.playbackSettings;
+    const modeSelect = document.getElementById("playbackMode");
+    const autoStartCheckbox = document.getElementById("autoStartPlayback");
+
+    if (modeSelect) {
+        modeSelect.value = settings.mode || "off";
+    }
+
+    if (autoStartCheckbox) {
+        autoStartCheckbox.checked = settings.auto_start_on_boot || false;
+    }
+
+    updatePlaybackModeUI();
+
+    // Populate preset selects
+    if (settings.mode === "dab_preset") {
+        populatePresetStationSelect();
+    } else if (settings.mode === "album") {
+        populatePresetAlbumSelect();
+    }
+}
+
+function updatePlaybackMode() {
+    const mode = document.getElementById("playbackMode").value;
+
+    const stationDiv = document.getElementById("presetStationSelect");
+    const albumDiv = document.getElementById("presetAlbumSelect");
+
+    if (stationDiv) stationDiv.style.display = (mode === "dab_preset") ? "block" : "none";
+    if (albumDiv) albumDiv.style.display = (mode === "album") ? "block" : "none";
+
+    if (mode === "dab_preset") populatePresetStationSelect();
+    if (mode === "album") populatePresetAlbumSelect();
+}
+
+function updatePlaybackModeUI() {
+    updatePlaybackMode();
+}
+
+function populatePresetStationSelect() {
+    const select = document.getElementById("presetStation");
+    if (!select) return;
+
+    select.innerHTML = state.favorites.map((s, i) =>
+        `<option value="${i}">${esc(s.name)}</option>`
+    ).join('');
+
+    // Select current preset if exists
+    if (state.playbackSettings.preset_station) {
+        const preset = state.playbackSettings.preset_station;
+        const idx = state.favorites.findIndex(f =>
+            f.service_id === preset.service_id && f.ensemble_id === preset.ensemble_id
+        );
+        if (idx >= 0) select.value = idx;
+    }
+}
+
+function populatePresetAlbumSelect() {
+    const select = document.getElementById("presetAlbum");
+    if (!select) return;
+
+    select.innerHTML = state.albums.map(a =>
+        `<option value="${a.id}">${esc(a.name)}</option>`
+    ).join('');
+
+    // Select current preset if exists
+    if (state.playbackSettings.preset_album_id) {
+        select.value = state.playbackSettings.preset_album_id;
+    }
+}
+
+async function savePlaybackSettings() {
+    const mode = document.getElementById("playbackMode").value;
+    const autoStart = document.getElementById("autoStartPlayback").checked;
+
+    let body = {
+        mode: mode,
+        auto_start_on_boot: autoStart
+    };
+
+    // Add mode-specific settings
+    if (mode === "dab_preset") {
+        const stationIdx = parseInt(document.getElementById("presetStation").value);
+        if (!isNaN(stationIdx) && state.favorites[stationIdx]) {
+            body.preset_station = state.favorites[stationIdx];
+        }
+    } else if (mode === "album") {
+        const albumId = document.getElementById("presetAlbum").value;
+        if (albumId) {
+            body.preset_album_id = albumId;
+        }
+    }
+
+    const res = await api("/playback/mode", "POST", body);
+    if (res && res.status === "ok") {
+        toast("Einstellungen gespeichert");
+        state.playbackSettings = body;
+    } else {
+        toast("Fehler beim Speichern", "error");
+    }
+}
+
+// ─── DAB Board Status ───────────────────────────────
+
+async function checkDabBoard() {
+    const statusDiv = document.getElementById("dabBoardStatus");
+    if (!statusDiv) return;
+
+    statusDiv.innerHTML = `<div class="spinner"></div><span>Prüfe DAB Board...</span>`;
+
+    const res = await api("/dab/board/status");
+    if (res) {
+        const icon = res.detected ? "✅" : "❌";
+        const statusClass = res.detected ? "status-ok" : "status-error";
+        statusDiv.innerHTML = `
+            <div class="${statusClass}">
+                <span>${icon} ${esc(res.message)}</span>
+            </div>
+        `;
+    } else {
+        statusDiv.innerHTML = `<div class="status-error"><span>❌ Prüfung fehlgeschlagen</span></div>`;
+    }
+}
+
+// ─── Quality Badges ─────────────────────────────────
+
+function getQualityLevel(quality) {
+    if (quality >= 61) return "good";
+    if (quality >= 31) return "medium";
+    return "low";
+}
+
 // ─── Helpers ────────────────────────────────────────
 
 function esc(str) {
+    if (!str) return "";
     const div = document.createElement("div");
     div.textContent = str;
     return div.innerHTML;
