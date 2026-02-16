@@ -161,6 +161,12 @@ class BluetoothManager:
     def pair(self, mac):
         """Gerät paaren."""
         self.power_on()
+
+        # Kurzer Scan damit Gerät für bluetoothd sichtbar wird
+        scan_output = self._run_btctl(["scan on"], timeout=3)
+        time.sleep(2)
+        self._run_btctl(["scan off"])
+
         output = self._run_btctl([
             f"pair {mac}",
         ], timeout=30)
