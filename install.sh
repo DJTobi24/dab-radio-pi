@@ -72,9 +72,27 @@ if grep -q "^dtparam=audio=on" "$CONFIG_FILE"; then
     sed -i 's/^dtparam=audio=on/dtparam=audio=off/' "$CONFIG_FILE"
 fi
 
-echo "📡 [4/9] Standard-WLAN konfigurieren..."
-# wpa_supplicant Konfiguration für Standard-WLAN
-cat > /etc/wpa_supplicant/wpa_supplicant.conf << 'EOF'
+echo "📡 [4/9] WLAN-Konfiguration prüfen..."
+# Prüfe ob bereits WLAN konfiguriert ist (z.B. via Raspberry Pi Imager)
+if [ -f /etc/wpa_supplicant/wpa_supplicant.conf ] && grep -q "network=" /etc/wpa_supplicant/wpa_supplicant.conf; then
+    echo "   ✅ Bestehende WLAN-Konfiguration gefunden - wird beibehalten"
+
+    # Füge "***WIFI_REMOVED***" als Fallback hinzu (falls noch nicht vorhanden)
+    if ! grep -q "***WIFI_REMOVED***" /etc/wpa_supplicant/wpa_supplicant.conf; then
+        echo "   📝 Füge '***WIFI_REMOVED***' als Fallback-WLAN hinzu..."
+        cat >> /etc/wpa_supplicant/wpa_supplicant.conf << 'EOF'
+
+network={
+    ssid="***WIFI_REMOVED***"
+    psk="***REMOVED***"
+    priority=5
+}
+EOF
+    fi
+else
+    echo "   📝 Keine WLAN-Konfiguration gefunden - setze '***WIFI_REMOVED***' als Standard..."
+    # Erstelle neue wpa_supplicant Konfiguration
+    cat > /etc/wpa_supplicant/wpa_supplicant.conf << 'EOF'
 country=DE
 ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
 update_config=1
@@ -85,8 +103,8 @@ network={
     priority=10
 }
 EOF
-
-echo "   ✅ Standard-WLAN '***WIFI_REMOVED***' konfiguriert"
+    echo "   ✅ Standard-WLAN '***WIFI_REMOVED***' konfiguriert"
+fi
 
 echo "🔵 [5/9] Bluetooth konfigurieren..."
 # Bluetooth Auto-Power
