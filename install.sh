@@ -89,7 +89,7 @@ if ! grep -q "AutoEnable=true" /etc/bluetooth/main.conf 2>/dev/null; then
 fi
 
 systemctl enable bluetooth
-systemctl enable pulseaudio
+# PulseAudio läuft als User-Service in Trixie, kein System-Service nötig
 
 echo "🐍 [6/9] Python App installieren..."
 mkdir -p "$APP_DIR"
