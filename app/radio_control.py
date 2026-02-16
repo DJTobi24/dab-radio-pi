@@ -222,10 +222,11 @@ class RadioControl:
                     pass
             self.audio_process = None
 
-        # Auch evtl. laufende arecord/pacat/paplay Prozesse beenden
+        # Auch evtl. laufende Audio-Prozesse beenden
         subprocess.run(["pkill", "-f", "arecord.*dabboard"], capture_output=True)
         subprocess.run(["pkill", "-f", "pacat"], capture_output=True)
         subprocess.run(["pkill", "-f", "paplay"], capture_output=True)
+        subprocess.run(["pkill", "-f", "mpg123"], capture_output=True)
 
     def set_volume(self, level):
         """Lautstärke setzen (0-63)."""
@@ -328,8 +329,11 @@ class RadioControl:
             sink_mac = bt_mac.replace(":", "_")
             sink_name = f"bluez_sink.{sink_mac}.a2dp_sink"
 
-            # Play audio file through PulseAudio to Bluetooth
-            cmd = f"paplay --device={sink_name} \"{file_path}\""
+            # Use mpg123 for audio files (supports MP3, FLAC, etc.)
+            # -o pulse: Use PulseAudio output
+            # -q: Quiet mode
+            # --sink: Specify PulseAudio sink
+            cmd = f"mpg123 -o pulse --sink {sink_name} -q \"{file_path}\""
 
             self.audio_process = subprocess.Popen(
                 cmd, shell=True,

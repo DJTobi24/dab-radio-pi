@@ -34,6 +34,7 @@ apt-get install -y -qq \
     bluez pulseaudio pulseaudio-module-bluetooth \
     alsa-utils \
     libncurses6 \
+    mpg123 \
     unzip wget \
     iptables \
     wpasupplicant wireless-tools
