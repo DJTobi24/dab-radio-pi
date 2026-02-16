@@ -7,15 +7,17 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>DAB+ Radio</title>
     <link rel="stylesheet" href="/static/app.css">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📻</text></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234f46e5'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z'/><path d='M12 6c-3.31 0-6 2.69-6 6h2c0-2.21 1.79-4 4-4s4 1.79 4 4-1.79 4-4 4v2c3.31 0 6-2.69 6-6s-2.69-6-6-6z'/></svg>">
 </head>
 <body>
     <div id="app">
         <!-- Header -->
         <header class="header">
             <div class="header-content">
-                <div class="logo">📻</div>
-                <h1>DAB+ Radio</h1>
+                <div class="logo">
+                    <div class="logo-icon">DR</div>
+                    <span class="logo-text">DAB+ Radio</span>
+                </div>
                 <div class="bt-indicator" id="btIndicator" title="Bluetooth">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M6.5 6.5l11 11L12 23V1l5.5 5.5-11 11"/>
@@ -25,39 +27,30 @@
         </header>
 
         <!-- Now Playing -->
-        <section class="now-playing" id="nowPlaying">
-            <div class="np-info">
-                <div class="np-status" id="npStatus">Kein Sender</div>
-                <div class="np-station" id="npStation">—</div>
-                <div class="np-ensemble" id="npEnsemble"></div>
-            </div>
-            <div class="np-controls">
-                <button class="btn-stop" id="btnStop" title="Stop">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                        <rect x="6" y="6" width="12" height="12" rx="1"/>
+        <section class="now-playing">
+            <div class="now-playing-content">
+                <div class="now-playing-info">
+                    <div class="now-playing-label">Aktuell</div>
+                    <div class="now-playing-title" id="npStation">Kein Sender ausgewählt</div>
+                    <div class="now-playing-subtitle" id="npEnsemble"></div>
+                </div>
+                <div class="volume-control">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="volume-icon">
+                        <path d="M11 5L6 9H2v6h4l5 4V5z"/>
                     </svg>
-                </button>
-            </div>
-        </section>
-
-        <!-- Volume -->
-        <section class="volume-section">
-            <div class="volume-bar">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="vol-icon">
-                    <path d="M11 5L6 9H2v6h4l5 4V5z"/>
-                </svg>
-                <input type="range" id="volumeSlider" min="0" max="63" value="40" class="volume-slider">
-                <span class="vol-value" id="volValue">40</span>
+                    <input type="range" id="volumeSlider" min="0" max="63" value="40" class="volume-slider">
+                    <span class="volume-value" id="volValue">40</span>
+                </div>
             </div>
         </section>
 
         <!-- Tab Navigation -->
         <nav class="tabs">
-            <button class="tab active" data-tab="favorites">★ Favoriten</button>
-            <button class="tab" data-tab="stations">📡 Sender</button>
-            <button class="tab" data-tab="music">🎵 Musik</button>
-            <button class="tab" data-tab="bluetooth">🔵 Bluetooth</button>
-            <button class="tab" data-tab="settings">⚙️ Einstellungen</button>
+            <button class="tab active" data-tab="favorites">Favoriten</button>
+            <button class="tab" data-tab="stations">Sender</button>
+            <button class="tab" data-tab="music">Musik</button>
+            <button class="tab" data-tab="bluetooth">Bluetooth</button>
+            <button class="tab" data-tab="settings">Einstellungen</button>
         </nav>
 
         <!-- Tab: Favoriten -->
@@ -65,7 +58,7 @@
             <div class="station-list" id="favoritesList">
                 <div class="empty-state">
                     <p>Noch keine Favoriten</p>
-                    <p class="hint">Tippe ★ bei einem Sender um ihn zu speichern</p>
+                    <p class="hint">Klicke auf das Stern-Symbol bei einem Sender um ihn als Favorit zu speichern</p>
                 </div>
             </div>
         </section>
@@ -92,7 +85,7 @@
         <section class="tab-content" id="tab-music">
             <!-- Album Creation Form -->
             <div class="settings-card">
-                <h3>📀 Neues Album erstellen</h3>
+                <h3> Neues Album erstellen</h3>
                 <div class="setting-group">
                     <input type="text" id="newAlbumName" placeholder="Album-Name">
                     <textarea id="newAlbumDesc" placeholder="Beschreibung (optional)" rows="2"></textarea>
@@ -157,7 +150,7 @@
 
             <!-- AP Settings -->
             <div class="settings-card">
-                <h3>📡 Access Point Einstellungen</h3>
+                <h3>Access Point Einstellungen</h3>
                 <div class="setting-group">
                     <label>WLAN-Name (SSID)</label>
                     <input type="text" id="apSsid" placeholder="DAB-Radio">
@@ -228,7 +221,7 @@
 
             <!-- Storage Info -->
             <div class="settings-card">
-                <h3>💾 Speicherplatz</h3>
+                <h3>Speicherplatz</h3>
                 <div class="storage-bar">
                     <div class="storage-used" id="storageUsedBar"></div>
                 </div>
@@ -240,7 +233,7 @@
 
             <!-- Playback Mode -->
             <div class="settings-card">
-                <h3>🎶 Wiedergabe-Modus</h3>
+                <h3>Wiedergabe-Modus</h3>
                 <div class="setting-group">
                     <label>Modus beim Start</label>
                     <select id="playbackMode" onchange="updatePlaybackMode()">
@@ -283,7 +276,7 @@
 
             <!-- DAB Board Status -->
             <div class="settings-card">
-                <h3>📻 DAB-Board Status</h3>
+                <h3>DAB-Board Status</h3>
                 <div id="dabBoardStatus" class="status-info">
                     <div class="spinner"></div>
                     <span>Klicke auf "Prüfen" um den Status zu ermitteln</span>
@@ -300,10 +293,10 @@
 
             <!-- System Actions -->
             <div class="settings-card">
-                <h3>⚡ System</h3>
+                <h3>System</h3>
                 <div class="setting-group">
                     <button class="btn-danger" onclick="switchToApMode()">
-                        📡 Zurück zu AP-Modus
+                        Zurück zu AP-Modus
                     </button>
                     <p class="hint">Trennt die Client-Verbindung und startet den Access Point</p>
                 </div>
