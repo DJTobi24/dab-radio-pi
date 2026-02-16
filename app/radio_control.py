@@ -331,9 +331,9 @@ class RadioControl:
 
             # Use mpg123 for audio files (supports MP3, FLAC, etc.)
             # -o pulse: Use PulseAudio output
+            # -a: Specify audio device (PulseAudio sink)
             # -q: Quiet mode
-            # --sink: Specify PulseAudio sink
-            cmd = f"mpg123 -o pulse --sink {sink_name} -q \"{file_path}\""
+            cmd = f"mpg123 -o pulse -a {sink_name} -q \"{file_path}\""
 
             self.audio_process = subprocess.Popen(
                 cmd, shell=True,
