@@ -1,0 +1,201 @@
+"""
+bt_manager.py — Bluetooth-Gerätemanager
+Verwaltet Bluetooth-Verbindungen via bluetoothctl / D-Bus.
+"""
+
+import subprocess
+import re
+import time
+import threading
+import json
+import os
+
+DATA_DIR = "/var/lib/dab-radio"
+BT_CONFIG_FILE = os.path.join(DATA_DIR, "bluetooth.json")
+
+
+class BluetoothManager:
+    def __init__(self):
+        self.connected_device = None
+        self.scanning = False
+        self._scan_thread = None
+        self._load_config()
+
+    def _run_btctl(self, commands, timeout=15):
+        """Führt bluetoothctl Befehle aus."""
+        try:
+            input_str = "\n".join(commands) + "\nquit\n"
+            result = subprocess.run(
+                ["bluetoothctl"],
+                input=input_str,
+                capture_output=True,
+                text=True,
+                timeout=timeout
+            )
+            return result.stdout
+        except subprocess.TimeoutExpired:
+            return ""
+        except Exception as e:
+            return ""
+
+    def power_on(self):
+        """Bluetooth einschalten."""
+        self._run_btctl(["power on", "agent on", "default-agent"])
+
+    def get_devices(self):
+        """Gibt Liste bekannter Bluetooth-Geräte zurück."""
+        output = self._run_btctl(["devices"])
+        devices = []
+        seen = set()
+
+        for line in output.split("\n"):
+            match = re.search(r"Device\s+([0-9A-F:]{17})\s+(.+)", line)
+            if match:
+                mac = match.group(1)
+                name = match.group(2).strip()
+                if mac not in seen:
+                    seen.add(mac)
+                    devices.append({
+                        "mac": mac,
+                        "name": name,
+                        "connected": self._is_connected(mac),
+                    })
+
+        return devices
+
+    def get_paired_devices(self):
+        """Gibt Liste der gepaarten Geräte zurück."""
+        output = self._run_btctl(["paired-devices"])
+        devices = []
+
+        for line in output.split("\n"):
+            match = re.search(r"Device\s+([0-9A-F:]{17})\s+(.+)", line)
+            if match:
+                mac = match.group(1)
+                name = match.group(2).strip()
+                devices.append({
+                    "mac": mac,
+                    "name": name,
+                    "connected": self._is_connected(mac),
+                    "paired": True,
+                })
+
+        return devices
+
+    def _is_connected(self, mac):
+        """Prüft ob ein Gerät verbunden ist."""
+        output = self._run_btctl([f"info {mac}"])
+        return "Connected: yes" in output
+
+    def start_scan(self, duration=15):
+        """Startet Bluetooth-Scan im Hintergrund."""
+        if self.scanning:
+            return False
+
+        self.scanning = True
+
+        def _scan():
+            try:
+                self._run_btctl(["scan on"], timeout=duration + 5)
+                time.sleep(duration)
+                self._run_btctl(["scan off"])
+            finally:
+                self.scanning = False
+
+        self._scan_thread = threading.Thread(target=_scan, daemon=True)
+        self._scan_thread.start()
+        return True
+
+    def pair(self, mac):
+        """Gerät paaren."""
+        self.power_on()
+        output = self._run_btctl([
+            f"pair {mac}",
+        ], timeout=30)
+
+        success = "Pairing successful" in output or "Already exists" in output
+        if success:
+            # Trust setzen damit auto-reconnect funktioniert
+            self._run_btctl([f"trust {mac}"])
+        return success
+
+    def connect(self, mac):
+        """Mit Bluetooth-Gerät verbinden."""
+        self.power_on()
+
+        # Erst pairen falls nötig
+        if not self._is_paired(mac):
+            self.pair(mac)
+
+        output = self._run_btctl([f"connect {mac}"], timeout=20)
+        success = "Connection successful" in output or "Connected: yes" in output
+
+        if success:
+            self.connected_device = mac
+            self._save_config()
+
+        # Kurz warten bis A2DP Profil bereit ist
+        time.sleep(2)
+        return success
+
+    def disconnect(self, mac=None):
+        """Bluetooth-Gerät trennen."""
+        if mac is None:
+            mac = self.connected_device
+        if mac:
+            self._run_btctl([f"disconnect {mac}"])
+            if self.connected_device == mac:
+                self.connected_device = None
+                self._save_config()
+            return True
+        return False
+
+    def _is_paired(self, mac):
+        """Prüft ob ein Gerät gepaart ist."""
+        output = self._run_btctl([f"info {mac}"])
+        return "Paired: yes" in output
+
+    def remove_device(self, mac):
+        """Gerät komplett entfernen (unpair)."""
+        self._run_btctl([f"remove {mac}"])
+        if self.connected_device == mac:
+            self.connected_device = None
+            self._save_config()
+        return True
+
+    def get_connected_device(self):
+        """Gibt das aktuell verbundene Gerät zurück."""
+        if self.connected_device and self._is_connected(self.connected_device):
+            return self.connected_device
+        self.connected_device = None
+        return None
+
+    def auto_reconnect(self):
+        """Versucht das zuletzt verbundene Gerät automatisch zu verbinden."""
+        if self.connected_device:
+            return self.connect(self.connected_device)
+        return False
+
+    def get_status(self):
+        """Status-Zusammenfassung."""
+        connected = self.get_connected_device()
+        return {
+            "scanning": self.scanning,
+            "connected_mac": connected,
+            "connected": connected is not None,
+        }
+
+    def _save_config(self):
+        try:
+            with open(BT_CONFIG_FILE, "w") as f:
+                json.dump({"last_device": self.connected_device}, f)
+        except IOError:
+            pass
+
+    def _load_config(self):
+        try:
+            with open(BT_CONFIG_FILE, "r") as f:
+                data = json.load(f)
+                self.connected_device = data.get("last_device")
+        except (IOError, json.JSONDecodeError):
+            self.connected_device = None

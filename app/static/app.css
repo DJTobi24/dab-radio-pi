@@ -1,0 +1,589 @@
+/* ═══════════════════════════════════════════
+   DAB+ Radio — Mobile-First Web Interface
+   Dark industrial radio aesthetic
+   ═══════════════════════════════════════════ */
+
+:root {
+    --bg: #0c0c0e;
+    --surface: #16161a;
+    --surface-2: #1e1e24;
+    --border: #2a2a32;
+    --text: #e8e6e3;
+    --text-dim: #8b8a88;
+    --accent: #ff6b35;
+    --accent-glow: rgba(255, 107, 53, 0.25);
+    --green: #22c55e;
+    --green-glow: rgba(34, 197, 94, 0.3);
+    --blue: #3b82f6;
+    --blue-glow: rgba(59, 130, 246, 0.3);
+    --red: #ef4444;
+    --radius: 10px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Header ─── */
+
+.header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 480px;
+    margin: 0 auto;
+}
+
+.logo {
+    font-size: 28px;
+    line-height: 1;
+}
+
+.header h1 {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    flex: 1;
+}
+
+.bt-indicator {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    color: var(--text-dim);
+    transition: all 0.3s;
+}
+
+.bt-indicator.connected {
+    color: var(--blue);
+    background: var(--blue-glow);
+}
+
+/* ─── Now Playing ─── */
+
+.now-playing {
+    background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    max-width: 480px;
+    margin: 0 auto;
+}
+
+.np-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.np-status {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+}
+
+.np-status.playing {
+    color: var(--green);
+}
+
+.np-station {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.np-ensemble {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 2px;
+}
+
+.btn-stop {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.btn-stop:active {
+    transform: scale(0.92);
+    border-color: var(--red);
+    color: var(--red);
+}
+
+/* ─── Volume ─── */
+
+.volume-section {
+    padding: 14px 16px;
+    max-width: 480px;
+    margin: 0 auto;
+}
+
+.volume-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.vol-icon {
+    color: var(--text-dim);
+    flex-shrink: 0;
+}
+
+.volume-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    outline: none;
+}
+
+.volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 0 10px var(--accent-glow);
+}
+
+.volume-slider::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 0 10px var(--accent-glow);
+}
+
+.vol-value {
+    font-size: 13px;
+    color: var(--text-dim);
+    min-width: 24px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ─── Tabs ─── */
+
+.tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 0 8px;
+}
+
+.tab {
+    flex: 1;
+    padding: 12px 8px;
+    border: none;
+    background: none;
+    color: var(--text-dim);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.tab:active {
+    opacity: 0.7;
+}
+
+/* ─── Tab Content ─── */
+
+.tab-content {
+    display: none;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 12px 0;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* ─── Scan Bar ─── */
+
+.scan-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px 12px;
+}
+
+.btn-scan {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-scan:active {
+    transform: scale(0.96);
+    background: var(--surface-2);
+}
+
+.btn-scan.scanning {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.station-count {
+    font-size: 13px;
+    color: var(--text-dim);
+}
+
+/* ─── Scan Progress ─── */
+
+.scan-progress {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    margin: 0 16px 12px;
+    background: var(--surface);
+    border-radius: var(--radius);
+    font-size: 13px;
+    color: var(--text-dim);
+}
+
+.spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ─── Station List ─── */
+
+.station-list {
+    padding: 0 8px;
+}
+
+.station-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.station-item:active {
+    background: var(--surface);
+}
+
+.station-item.playing {
+    background: var(--surface);
+    border-left: 3px solid var(--green);
+}
+
+.station-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: var(--surface-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+    color: var(--accent);
+    font-weight: 700;
+}
+
+.station-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.station-name {
+    font-size: 15px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.station-meta {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 1px;
+}
+
+.btn-fav {
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: none;
+    color: var(--text-dim);
+    font-size: 18px;
+    cursor: pointer;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.btn-fav.is-fav {
+    color: #fbbf24;
+}
+
+.btn-fav:active {
+    transform: scale(1.2);
+}
+
+.btn-fav-remove {
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: none;
+    color: var(--red);
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.6;
+}
+
+.btn-fav-remove:active {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+/* ─── Empty State ─── */
+
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-dim);
+}
+
+.empty-state p {
+    margin-bottom: 4px;
+}
+
+.empty-state .hint {
+    font-size: 13px;
+    opacity: 0.7;
+}
+
+/* ─── Bluetooth ─── */
+
+.bt-status {
+    padding: 0 16px 8px;
+}
+
+.bt-connected-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--blue);
+    box-shadow: 0 0 12px var(--blue-glow);
+}
+
+.bt-device-name {
+    font-weight: 600;
+    font-size: 15px;
+}
+
+.btn-bt-disconnect {
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--red);
+    background: transparent;
+    color: var(--red);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-bt-disconnect:active {
+    background: var(--red);
+    color: white;
+}
+
+.bt-device-list {
+    padding: 0 8px;
+}
+
+.bt-device-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-radius: var(--radius);
+}
+
+.bt-device-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.bt-device-icon svg {
+    color: var(--blue);
+}
+
+.bt-device-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.bt-device-name-text {
+    font-size: 15px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bt-device-mac {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: monospace;
+}
+
+.bt-device-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--green-glow);
+    color: var(--green);
+    font-weight: 600;
+}
+
+.btn-bt-connect {
+    padding: 8px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--blue);
+    background: transparent;
+    color: var(--blue);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.btn-bt-connect:active {
+    background: var(--blue);
+    color: white;
+}
+
+.btn-bt-connect.connecting {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* ─── Toast Notifications ─── */
+
+.toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--surface-2);
+    color: var(--text);
+    padding: 12px 20px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    border: 1px solid var(--border);
+    z-index: 1000;
+    opacity: 0;
+    transition: all 0.3s ease;
+    max-width: calc(100vw - 32px);
+    text-align: center;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.toast.error {
+    border-color: var(--red);
+}
+
+.toast.success {
+    border-color: var(--green);
+}
