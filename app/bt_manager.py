@@ -115,19 +115,42 @@ class BluetoothManager:
 
         def _scan():
             try:
-                # Scan starten und Output lesen
-                output = self._run_btctl(["scan on"], timeout=duration + 5)
-                time.sleep(duration)
-                self._run_btctl(["scan off"])
+                # Interaktiver Scan mit Output-Parsing
+                proc = subprocess.Popen(
+                    ["bluetoothctl"],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    bufsize=1
+                )
 
-                # Gescannte Geräte erfassen
-                scan_output = self._run_btctl(["devices"])
-                for line in scan_output.split("\n"):
-                    match = re.search(r"Device\s+([0-9A-F:]{17})\s+(.+)", line)
-                    if match:
-                        mac = match.group(1)
-                        name = match.group(2).strip()
-                        self._discovered_devices[mac] = name
+                # Scan starten
+                proc.stdin.write("scan on\n")
+                proc.stdin.flush()
+
+                # Scan-Output für duration Sekunden lesen
+                import select
+                end_time = time.time() + duration
+                while time.time() < end_time:
+                    if proc.stdout in select.select([proc.stdout], [], [], 0.5)[0]:
+                        line = proc.stdout.readline()
+                        # Parse NEW/CHG Device lines
+                        match = re.search(r'Device\s+([0-9A-F:]{17})\s+(.+)', line)
+                        if match:
+                            mac = match.group(1)
+                            name = match.group(2).strip()
+                            # Entferne ANSI Escape Codes
+                            name = re.sub(r'\x1b\[[0-9;]*m', '', name)
+                            self._discovered_devices[mac] = name
+
+                # Scan beenden
+                proc.stdin.write("scan off\n")
+                proc.stdin.write("quit\n")
+                proc.stdin.flush()
+                proc.wait(timeout=5)
+            except Exception as e:
+                pass
             finally:
                 self.scanning = False
 
