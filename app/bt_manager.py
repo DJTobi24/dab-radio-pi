@@ -19,6 +19,7 @@ class BluetoothManager:
         self.connected_device = None
         self.scanning = False
         self._scan_thread = None
+        self._discovered_devices = {}  # Cache für gescannte Geräte
         self._load_config()
 
     def _run_btctl(self, commands, timeout=15):
@@ -54,6 +55,7 @@ class BluetoothManager:
         devices = []
         seen = set()
 
+        # Bekannte Geräte aus bluetoothctl
         for line in output.split("\n"):
             match = re.search(r"Device\s+([0-9A-F:]{17})\s+(.+)", line)
             if match:
@@ -66,6 +68,16 @@ class BluetoothManager:
                         "name": name,
                         "connected": self._is_connected(mac),
                     })
+
+        # Gescannte Geräte hinzufügen (die noch nicht bekannt sind)
+        for mac, name in self._discovered_devices.items():
+            if mac not in seen:
+                seen.add(mac)
+                devices.append({
+                    "mac": mac,
+                    "name": name,
+                    "connected": False,
+                })
 
         return devices
 
@@ -103,9 +115,19 @@ class BluetoothManager:
 
         def _scan():
             try:
-                self._run_btctl(["scan on"], timeout=duration + 5)
+                # Scan starten und Output lesen
+                output = self._run_btctl(["scan on"], timeout=duration + 5)
                 time.sleep(duration)
                 self._run_btctl(["scan off"])
+
+                # Gescannte Geräte erfassen
+                scan_output = self._run_btctl(["devices"])
+                for line in scan_output.split("\n"):
+                    match = re.search(r"Device\s+([0-9A-F:]{17})\s+(.+)", line)
+                    if match:
+                        mac = match.group(1)
+                        name = match.group(2).strip()
+                        self._discovered_devices[mac] = name
             finally:
                 self.scanning = False
 
