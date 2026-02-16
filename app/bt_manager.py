@@ -40,6 +40,12 @@ class BluetoothManager:
 
     def power_on(self):
         """Bluetooth einschalten."""
+        # Rfkill unblock falls blockiert
+        try:
+            subprocess.run(["sudo", "rfkill", "unblock", "bluetooth"],
+                         capture_output=True, timeout=5)
+        except Exception:
+            pass
         self._run_btctl(["power on", "agent on", "default-agent"])
 
     def get_devices(self):
@@ -93,6 +99,7 @@ class BluetoothManager:
             return False
 
         self.scanning = True
+        self.power_on()  # Bluetooth erst einschalten
 
         def _scan():
             try:
