@@ -75,35 +75,11 @@ fi
 echo "📡 [4/9] WLAN-Konfiguration prüfen..."
 # Prüfe ob bereits WLAN konfiguriert ist (z.B. via Raspberry Pi Imager)
 if [ -f /etc/wpa_supplicant/wpa_supplicant.conf ] && grep -q "network=" /etc/wpa_supplicant/wpa_supplicant.conf; then
-    echo "   ✅ Bestehende WLAN-Konfiguration gefunden - wird beibehalten"
-
-    # Füge "***WIFI_REMOVED***" als Fallback hinzu (falls noch nicht vorhanden)
-    if ! grep -q "***WIFI_REMOVED***" /etc/wpa_supplicant/wpa_supplicant.conf; then
-        echo "   📝 Füge '***WIFI_REMOVED***' als Fallback-WLAN hinzu..."
-        cat >> /etc/wpa_supplicant/wpa_supplicant.conf << 'EOF'
-
-network={
-    ssid="***WIFI_REMOVED***"
-    psk="***REMOVED***"
-    priority=5
-}
-EOF
-    fi
+    echo "   ✅ Bestehende WLAN-Konfiguration gefunden - wird verwendet"
 else
-    echo "   📝 Keine WLAN-Konfiguration gefunden - setze '***WIFI_REMOVED***' als Standard..."
-    # Erstelle neue wpa_supplicant Konfiguration
-    cat > /etc/wpa_supplicant/wpa_supplicant.conf << 'EOF'
-country=DE
-ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
-update_config=1
-
-network={
-    ssid="***WIFI_REMOVED***"
-    psk="***REMOVED***"
-    priority=10
-}
-EOF
-    echo "   ✅ Standard-WLAN '***WIFI_REMOVED***' konfiguriert"
+    echo "   ⚠️  Keine WLAN-Konfiguration gefunden!"
+    echo "   Bitte WLAN über Raspberry Pi Imager konfigurieren oder manuell einrichten."
+    echo "   Installation wird fortgesetzt, aber WLAN muss nachträglich konfiguriert werden."
 fi
 
 echo "🔵 [5/9] Bluetooth konfigurieren..."
@@ -137,8 +113,8 @@ cat > /var/lib/dab-radio/network.json << 'EOF'
   "mode": "client",
   "ap_ssid": "DAB-Radio",
   "ap_password": "dabradio123",
-  "client_ssid": "***WIFI_REMOVED***",
-  "client_password": "***REMOVED***",
+  "client_ssid": "",
+  "client_password": "",
   "fallback_enabled": true,
   "default_volume": 40
 }
