@@ -188,14 +188,18 @@ class RadioControl:
             return False
 
     def start_bluetooth_audio(self, bt_mac):
-        """Starte Audio-Streaming vom I2S zum Bluetooth-Gerät."""
+        """Starte Audio-Streaming vom I2S zum Bluetooth-Gerät via PulseAudio."""
         with self._lock:
             self.stop_audio()
 
-            # arecord von I2S (dabboard) | aplay via bluealsa
+            # Convert MAC address for PulseAudio sink name
+            sink_mac = bt_mac.replace(":", "_")
+            sink_name = f"bluez_sink.{sink_mac}.a2dp_sink"
+
+            # arecord von I2S (dabboard) | pacat zu PulseAudio Bluetooth sink
             cmd = (
                 f"arecord -D sysdefault:CARD=dabboard -c 2 -r 48000 -f S16_LE -t raw -q "
-                f"| aplay -D bluealsa:DEV={bt_mac},PROFILE=a2dp -c 2 -r 48000 -f S16_LE -t raw -q"
+                f"| pacat --device={sink_name} --rate=48000 --channels=2 --format=s16le --raw"
             )
 
             self.audio_process = subprocess.Popen(
@@ -218,9 +222,10 @@ class RadioControl:
                     pass
             self.audio_process = None
 
-        # Auch evtl. laufende arecord/aplay Prozesse beenden
+        # Auch evtl. laufende arecord/pacat/paplay Prozesse beenden
         subprocess.run(["pkill", "-f", "arecord.*dabboard"], capture_output=True)
-        subprocess.run(["pkill", "-f", "aplay.*bluealsa"], capture_output=True)
+        subprocess.run(["pkill", "-f", "pacat"], capture_output=True)
+        subprocess.run(["pkill", "-f", "paplay"], capture_output=True)
 
     def set_volume(self, level):
         """Lautstärke setzen (0-63)."""
@@ -304,7 +309,7 @@ class RadioControl:
 
     def start_music_playback(self, file_path, bt_mac):
         """
-        Play music file through BlueALSA.
+        Play music file through PulseAudio to Bluetooth.
 
         Args:
             file_path: Absolute path to audio file
@@ -319,8 +324,12 @@ class RadioControl:
             if not os.path.exists(file_path):
                 return False
 
-            # Play audio file through BlueALSA
-            cmd = f"aplay -D bluealsa:DEV={bt_mac},PROFILE=a2dp \"{file_path}\" -q"
+            # Convert MAC address for PulseAudio sink name
+            sink_mac = bt_mac.replace(":", "_")
+            sink_name = f"bluez_sink.{sink_mac}.a2dp_sink"
+
+            # Play audio file through PulseAudio to Bluetooth
+            cmd = f"paplay --device={sink_name} \"{file_path}\""
 
             self.audio_process = subprocess.Popen(
                 cmd, shell=True,
