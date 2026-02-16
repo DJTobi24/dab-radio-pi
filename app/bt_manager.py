@@ -227,12 +227,28 @@ class BluetoothManager:
         """Mit Bluetooth-Gerät verbinden."""
         self.power_on()
 
+        # Prüfe ob bereits verbunden
+        if self._is_connected(mac):
+            self.connected_device = mac
+            self._save_config()
+            return True
+
         # Erst pairen falls nötig
         if not self._is_paired(mac):
-            self.pair(mac)
+            if not self.pair(mac):
+                # Prüfe nochmal ob verbunden (Pairing könnte verbunden haben)
+                if self._is_connected(mac):
+                    self.connected_device = mac
+                    self._save_config()
+                    return True
+                return False
 
         output = self._run_btctl([f"connect {mac}"], timeout=20)
-        success = "Connection successful" in output or "Connected: yes" in output
+        success = "Connection successful" in output or "Connected: yes" in output or "AlreadyConnected" in output
+
+        # Falls connect fehlschlägt, prüfe ob trotzdem verbunden
+        if not success:
+            success = self._is_connected(mac)
 
         if success:
             self.connected_device = mac
