@@ -191,8 +191,27 @@ class PlaybackController:
         if not track_path:
             return False
 
+        # Get album and track metadata
+        album = self.music.get_album(album_id)
+        track_title = None
+        total_tracks = 0
+        album_name = ""
+        if album:
+            album_name = album.get("name", "")
+            total_tracks = len(album.get("tracks", []))
+            tracks = album.get("tracks", [])
+            if track_index < len(tracks):
+                track_title = tracks[track_index].get("title")
+
         # Use radio control to play music file
-        success = self.radio.start_music_playback(track_path, bt_mac)
+        success = self.radio.start_music_playback(
+            track_path, bt_mac,
+            track_title=track_title,
+            album_name=album_name,
+            album_id=album_id,
+            track_index=track_index,
+            total_tracks=total_tracks,
+        )
 
         if success:
             # Update last played info

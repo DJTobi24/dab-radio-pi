@@ -30,9 +30,19 @@
         <section class="now-playing">
             <div class="now-playing-content">
                 <div class="now-playing-info">
-                    <div class="now-playing-label">Aktuell</div>
+                    <div class="now-playing-label" id="npLabel">Aktuell</div>
                     <div class="now-playing-title" id="npStation">Kein Sender ausgewählt</div>
                     <div class="now-playing-subtitle" id="npEnsemble"></div>
+                </div>
+                <!-- Music Progress Bar -->
+                <div class="music-progress" id="musicProgress" style="display:none">
+                    <div class="progress-bar-container">
+                        <div class="progress-bar-fill" id="progressBarFill"></div>
+                    </div>
+                    <div class="progress-times">
+                        <span id="progressElapsed">0:00</span>
+                        <span id="progressDuration">0:00</span>
+                    </div>
                 </div>
                 <div class="volume-control">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="volume-icon">

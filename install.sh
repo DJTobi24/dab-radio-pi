@@ -31,7 +31,7 @@ apt-get update -qq
 apt-get install -y -qq \
     python3 python3-pip python3-venv \
     hostapd dnsmasq \
-    bluez pulseaudio pulseaudio-module-bluetooth \
+    bluez bluez-alsa-utils \
     alsa-utils \
     libncurses6 \
     mpg123 \
@@ -109,7 +109,14 @@ if ! grep -q "AutoEnable=true" /etc/bluetooth/main.conf 2>/dev/null; then
 fi
 
 systemctl enable bluetooth
-# PulseAudio läuft als User-Service in Trixie, kein System-Service nötig
+systemctl enable bluealsa
+
+# PulseAudio entfernen falls vorhanden (bluez-alsa ersetzt es)
+if dpkg -l | grep -q "^ii  pulseaudio "; then
+    echo "   Entferne PulseAudio (wird durch bluez-alsa ersetzt)..."
+    apt-get purge -y -qq pulseaudio pulseaudio-module-bluetooth 2>/dev/null || true
+    apt-get autoremove -y -qq 2>/dev/null || true
+fi
 
 echo "🐍 [6/9] Python App installieren..."
 mkdir -p "$APP_DIR"

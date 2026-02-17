@@ -54,8 +54,6 @@ def api_scan():
     """DAB-Sendersuchlauf starten."""
     def _do_scan():
         radio.scan_stations()
-        # Extract quality metrics after scan completes
-        radio.extract_quality_metrics()
 
     thread = threading.Thread(target=_do_scan, daemon=True)
     thread.start()

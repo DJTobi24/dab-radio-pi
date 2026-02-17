@@ -11,6 +11,8 @@ const state = {
     currentStation: null,
     isPlaying: false,
     volume: 40,
+    playbackMode: "dab",
+    musicInfo: null,
     btConnected: false,
     btConnectedMac: null,
     btScanning: false,
@@ -100,23 +102,52 @@ volumeSlider.addEventListener("input", () => {
 
 // ─── Now Playing ────────────────────────────────────
 
+function formatTime(seconds) {
+    if (!seconds || seconds < 0) return "0:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
 function updateNowPlaying() {
-    const npStatus = document.getElementById("npStatus");
+    const npLabel = document.getElementById("npLabel");
     const npStation = document.getElementById("npStation");
     const npEnsemble = document.getElementById("npEnsemble");
+    const musicProgress = document.getElementById("musicProgress");
 
-    if (!npStatus || !npStation || !npEnsemble) return;
+    if (!npStation || !npEnsemble) return;
 
-    if (state.isPlaying && state.currentStation) {
-        npStatus.textContent = "Läuft";
-        npStatus.className = "np-status playing";
+    const music = state.musicInfo;
+
+    if (state.isPlaying && state.playbackMode === "music" && music) {
+        // Music mode
+        if (npLabel) npLabel.textContent = music.album_name || "Musik";
+        npStation.textContent = music.title || "Unbekannt";
+        const trackNum = (music.track_index || 0) + 1;
+        const totalTracks = music.total_tracks || 0;
+        npEnsemble.textContent = totalTracks > 0 ? `Track ${trackNum} / ${totalTracks}` : "";
+
+        // Show progress bar
+        if (musicProgress) {
+            musicProgress.style.display = "block";
+            const fill = document.getElementById("progressBarFill");
+            const elapsedEl = document.getElementById("progressElapsed");
+            const durationEl = document.getElementById("progressDuration");
+            if (fill) fill.style.width = `${(music.progress || 0) * 100}%`;
+            if (elapsedEl) elapsedEl.textContent = formatTime(music.elapsed);
+            if (durationEl) durationEl.textContent = formatTime(music.duration);
+        }
+    } else if (state.isPlaying && state.currentStation) {
+        // DAB mode
+        if (npLabel) npLabel.textContent = "Aktuell";
         npStation.textContent = state.currentStation.name || "Unbekannt";
         npEnsemble.textContent = state.currentStation.ensemble_label || "";
+        if (musicProgress) musicProgress.style.display = "none";
     } else {
-        npStatus.textContent = "Kein Sender";
-        npStatus.className = "np-status";
-        npStation.textContent = "—";
+        if (npLabel) npLabel.textContent = "Aktuell";
+        npStation.textContent = "\u2014";
         npEnsemble.textContent = "";
+        if (musicProgress) musicProgress.style.display = "none";
     }
 }
 
@@ -128,6 +159,8 @@ if (btnStop) {
         await api("/stop", "POST");
         state.isPlaying = false;
         state.currentStation = null;
+        state.musicInfo = null;
+        state.playbackMode = "dab";
         updateNowPlaying();
         renderStations();
         renderFavorites();
@@ -482,10 +515,15 @@ async function pollStatus() {
         state.isPlaying = res.radio.is_playing;
         state.currentStation = res.radio.current_station;
         state.volume = res.radio.volume;
+        state.playbackMode = res.radio.playback_mode || "dab";
+        state.musicInfo = res.radio.music || null;
         volumeSlider.value = state.volume;
         volValue.textContent = state.volume;
         updateNowPlaying();
     }
+
+    // Adjust polling speed for music playback
+    startPolling();
 
     // BT Status (Name kommt direkt vom Server, kein extra API-Call nötig)
     if (res.bluetooth) {
@@ -1014,13 +1052,21 @@ function esc(str) {
 
 // ─── Init ───────────────────────────────────────────
 
+let pollInterval = null;
+
+function startPolling() {
+    if (pollInterval) clearInterval(pollInterval);
+    // Poll faster when music is playing (for progress bar)
+    const interval = (state.isPlaying && state.playbackMode === "music") ? 3000 : 10000;
+    pollInterval = setInterval(pollStatus, interval);
+}
+
 async function init() {
     await pollStatus();
     await loadStations();
     await loadFavorites();
 
-    // Status alle 10 Sekunden aktualisieren
-    setInterval(pollStatus, 10000);
+    startPolling();
 }
 
 init();
