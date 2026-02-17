@@ -346,26 +346,43 @@ function renderBtDevices(devices) {
         return;
     }
 
-    list.innerHTML = devices.map(d => {
-        const isConnected = d.connected;
-        return `
-            <div class="bt-device-item">
-                <div class="bt-device-icon">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M6.5 6.5l11 11L12 23V1l5.5 5.5-11 11"/>
-                    </svg>
-                </div>
-                <div class="bt-device-info">
-                    <div class="bt-device-name-text">${esc(d.name)}</div>
-                    <div class="bt-device-mac">${d.mac}</div>
-                </div>
-                ${d.paired ? '<span class="bt-device-badge">Gepaart</span>' : ''}
-                ${isConnected
-                    ? '<span class="bt-device-badge" style="background:var(--green-glow);color:var(--green)">Verbunden</span>'
-                    : `<button class="btn-bt-connect" onclick="connectBt('${d.mac}', '${esc(d.name)}', this)">Verbinden</button>`
-                }
-            </div>`;
-    }).join("");
+    // Geräte global speichern für Event-Handler
+    window._btDevices = devices;
+
+    list.innerHTML = devices.map((d, i) => `
+        <div class="bt-device-item">
+            <div class="bt-device-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6.5 6.5l11 11L12 23V1l5.5 5.5-11 11"/>
+                </svg>
+            </div>
+            <div class="bt-device-info">
+                <div class="bt-device-name-text">${esc(d.name)}</div>
+                <div class="bt-device-mac">${d.mac}${d.paired ? ' · Gepaart' : ''}</div>
+            </div>
+            ${d.connected
+                ? '<span class="bt-device-badge" style="background:var(--green-glow);color:var(--green)">Verbunden</span>'
+                : `<button class="btn-bt-connect" onclick="connectBtDevice(${i})">Verbinden</button>`
+            }
+        </div>`
+    ).join("");
+}
+
+// BT Gerät verbinden (über Index im globalen Array)
+function connectBtDevice(idx) {
+    const d = window._btDevices && window._btDevices[idx];
+    if (!d) return;
+    const buttons = document.querySelectorAll('.btn-bt-connect');
+    // Finde den richtigen Button basierend auf der Position
+    let btn = null;
+    let btnIdx = 0;
+    for (let i = 0; i <= idx; i++) {
+        if (window._btDevices[i] && !window._btDevices[i].connected) {
+            if (i === idx) btn = buttons[btnIdx];
+            btnIdx++;
+        }
+    }
+    connectBt(d.mac, d.name, btn);
 }
 
 // BT Scan
@@ -404,24 +421,27 @@ document.getElementById("btnBtScan").addEventListener("click", async () => {
 // BT Connect
 async function connectBt(mac, name, btn) {
     if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Verbinde...";
         btn.classList.add("connecting");
-        btn.textContent = "...";
     }
     toast(`Verbinde mit ${name}...`);
 
     const res = await api("/bt/connect", "POST", { mac });
 
     if (res && res.connected) {
+        const deviceName = res.name || name;
         state.btConnected = true;
         state.btConnectedMac = mac;
-        updateBtStatus(name, mac);
+        updateBtStatus(deviceName, mac);
         loadBtDevices();
-        toast(`🔵 ${name} verbunden`, "success");
+        toast(`Verbunden mit ${deviceName}`, "success");
     } else {
-        toast("Verbindung fehlgeschlagen", "error");
+        toast(res?.message || "Verbindung fehlgeschlagen", "error");
         if (btn) {
-            btn.classList.remove("connecting");
+            btn.disabled = false;
             btn.textContent = "Verbinden";
+            btn.classList.remove("connecting");
         }
     }
 }
@@ -444,7 +464,7 @@ function updateBtStatus(name, mac) {
     if (name) {
         indicator.classList.add("connected");
         info.style.display = "flex";
-        nameEl.textContent = `🔵 ${name}`;
+        nameEl.textContent = name;
     } else {
         indicator.classList.remove("connected");
         info.style.display = "none";
@@ -467,18 +487,16 @@ async function pollStatus() {
         updateNowPlaying();
     }
 
-    // BT Status
+    // BT Status (Name kommt direkt vom Server, kein extra API-Call nötig)
     if (res.bluetooth) {
         state.btConnected = res.bluetooth.connected;
         state.btConnectedMac = res.bluetooth.connected_mac;
 
         if (state.btConnected) {
-            // Hole Gerätename
-            const devRes = await api("/bt/devices");
-            if (devRes) {
-                const dev = (devRes.devices || []).find(d => d.mac === state.btConnectedMac);
-                updateBtStatus(dev?.name || state.btConnectedMac, state.btConnectedMac);
-            }
+            updateBtStatus(
+                res.bluetooth.connected_name || state.btConnectedMac,
+                state.btConnectedMac
+            );
         } else {
             updateBtStatus(null);
         }

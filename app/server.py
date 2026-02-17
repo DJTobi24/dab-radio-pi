@@ -147,14 +147,8 @@ def api_remove_favorite(idx):
 
 @app.route("/api/bt/devices")
 def api_bt_devices():
-    """Alle bekannten Bluetooth-Geräte."""
+    """Alle bekannten Bluetooth-Geräte (mit paired/connected Status)."""
     devices = bt.get_devices()
-    paired = bt.get_paired_devices()
-    paired_macs = {d["mac"] for d in paired}
-
-    for d in devices:
-        d["paired"] = d["mac"] in paired_macs
-
     return jsonify({"devices": devices})
 
 
@@ -179,13 +173,18 @@ def api_bt_connect():
     if not mac:
         return jsonify({"error": "Keine MAC-Adresse"}), 400
 
-    success = bt.connect(mac)
+    result = bt.connect(mac)
 
     # Falls Radio gerade spielt, Audio-Stream neu starten
-    if success and radio.is_playing:
+    if result["success"] and radio.is_playing:
         radio.start_bluetooth_audio(mac)
 
-    return jsonify({"connected": success, "mac": mac})
+    return jsonify({
+        "connected": result["success"],
+        "mac": mac,
+        "name": result.get("name"),
+        "message": result.get("message", ""),
+    })
 
 
 @app.route("/api/bt/disconnect", methods=["POST"])
