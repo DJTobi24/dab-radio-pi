@@ -4,14 +4,14 @@ After=network.target bluetooth.target
 
 [Service]
 Type=simple
-User=pi
+User=dab-musik
 WorkingDirectory=/opt/dab-radio
 ExecStart=/opt/dab-radio/venv/bin/python /opt/dab-radio/server.py
 Restart=always
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1
-Environment=XDG_RUNTIME_DIR=/run/user/%U
-Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%U/bus
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
 
 [Install]
 WantedBy=multi-user.target
