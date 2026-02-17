@@ -232,6 +232,9 @@ class BluetoothManager:
         Kompletter Bluetooth-Verbindungsablauf:
         power on → trust → pair (falls nötig) → connect → verify
 
+        Einfach und robust: nur bluetoothctl für Verbindungsprüfung.
+        PulseAudio erstellt den Audio-Sink automatisch im Hintergrund.
+
         Returns: {success: bool, message: str, name: str|None}
         """
         with self._lock:
@@ -257,13 +260,28 @@ class BluetoothManager:
                 mac, needs_pair=not already_paired
             )
 
-            # 3. Verbindung verifizieren
-            time.sleep(2)
+            # 3. Ergebnis auswerten
+            if session_result.get("success"):
+                # Session hat "Connected: yes" gesehen → vertrauen!
+                time.sleep(2)
+                info = self._btctl_query(f"info {mac}")
+                name = self._parse_device_name(info)
+                self._set_connected(mac, name)
+                _log(f"Erfolgreich verbunden: {name}")
+                return {
+                    "success": True,
+                    "message": f"Verbunden mit {name}",
+                    "name": name
+                }
+
+            # Session hat keinen Erfolg gemeldet → trotzdem prüfen
+            # (manche Geräte verbinden sich verzögert)
+            time.sleep(3)
             info = self._btctl_query(f"info {mac}")
             if "Connected: yes" in info:
                 name = self._parse_device_name(info)
                 self._set_connected(mac, name)
-                _log(f"Erfolgreich verbunden: {name}")
+                _log(f"Verzögert verbunden: {name}")
                 return {
                     "success": True,
                     "message": f"Verbunden mit {name}",
@@ -379,6 +397,7 @@ class BluetoothManager:
                 "Failed to connect",
                 "not available",
                 "AlreadyConnected",
+                "profile-unavailable",
             ], timeout_sec=15)
 
             cleanup()
@@ -387,6 +406,9 @@ class BluetoothManager:
                 "successful", "connected: yes", "alreadyconnected"
             ]):
                 return {"success": True}
+
+            if kw and "profile-unavailable" in kw.lower():
+                return {"error": "profile-unavailable - PulseAudio nicht bereit"}
 
             return {"error": "Verbindung konnte nicht hergestellt werden"}
 
@@ -465,11 +487,30 @@ class BluetoothManager:
 
     def auto_reconnect(self):
         """Automatisch mit dem letzten Gerät verbinden (beim Start)."""
+        # Erst prüfen ob bereits ein Gerät verbunden ist
+        self._detect_connected_device()
         if self.connected_device:
             _log(f"Auto-Reconnect: {self.connected_device}")
             result = self.connect(self.connected_device)
             return result.get("success", False)
         return False
+
+    def _detect_connected_device(self):
+        """Prüft ob bereits ein BT-Gerät verbunden ist (z.B. nach Service-Neustart)."""
+        try:
+            output = self._btctl_query("devices Connected")
+            for line in output.split("\n"):
+                match = re.search(r"Device\s+([0-9A-F:]{17})\s+(.+)", line)
+                if match:
+                    mac = match.group(1)
+                    info = self._btctl_query(f"info {mac}")
+                    if "Connected: yes" in info:
+                        name = self._parse_device_name(info)
+                        self._set_connected(mac, name)
+                        _log(f"Bereits verbundenes Gerät erkannt: {name} ({mac})")
+                        return
+        except Exception as e:
+            _log(f"Erkennung fehlgeschlagen: {e}")
 
     def get_status(self):
         """Status für API (mit Cache - schnell)."""

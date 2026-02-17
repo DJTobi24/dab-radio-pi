@@ -10,6 +10,8 @@ ExecStart=/opt/dab-radio/venv/bin/python /opt/dab-radio/server.py
 Restart=always
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1
+Environment=XDG_RUNTIME_DIR=/run/user/%U
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%U/bus
 
 [Install]
 WantedBy=multi-user.target
